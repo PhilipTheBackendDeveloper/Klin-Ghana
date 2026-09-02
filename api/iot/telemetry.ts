@@ -184,6 +184,7 @@ export default async function handler(req: any, res?: any) {
             if (!existing) {
               await supabase.from('alerts').insert({
                 bin_id: bin.id,
+                device_id: devId,
                 alert_type: alertType,
                 severity: 'CRITICAL',
                 status: 'OPEN',
