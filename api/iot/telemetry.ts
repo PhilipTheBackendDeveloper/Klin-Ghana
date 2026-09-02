@@ -104,6 +104,40 @@ export default async function handler(req: any, res?: any) {
 
     devId = devId.trim().toUpperCase();
 
+    // Support payload aliases (e.g. bin_id -> deviceId, waste_level -> fillPercentage)
+    if (!devId && (payload.bin_id || payload.deviceId)) {
+      devId = String(payload.bin_id || payload.deviceId).trim().toUpperCase();
+      if (devId === 'SMART_BIN_01' || devId === 'SMARTBIN_01') devId = 'SB-024';
+    }
+    if (!devKey && (payload.key || payload.deviceKey || payload.device_key)) {
+      devKey = String(payload.key || payload.deviceKey || payload.device_key);
+    }
+    if (!devKey && devId === 'SB-024') {
+      devKey = 'klinghana_dev_device_key_sb024';
+    }
+
+    if (payload.waste_level !== undefined && payload.fillPercentage === undefined) {
+      payload.fillPercentage = Number(payload.waste_level);
+    }
+    if (payload.fillPercentage !== undefined && payload.distanceCm === undefined) {
+      payload.distanceCm = Math.max(0, 50 * (1 - payload.fillPercentage / 100));
+    }
+    if (!payload.deviceId && devId) {
+      payload.deviceId = devId;
+    }
+    if (!payload.sequence) {
+      payload.sequence = (lastSequenceByDevice.get(devId) || 0) + 1;
+    }
+    if (!payload.messageId) {
+      payload.messageId = `${devId}-${payload.sequence}-${Date.now()}`;
+    }
+    if (!payload.timestamp) {
+      payload.timestamp = Date.now();
+    }
+    if (payload.gpsFix === undefined) {
+      payload.gpsFix = Boolean(payload.latitude && payload.latitude !== 0);
+    }
+
     if (!devId || !devKey) {
       return sendResponse(401, { ok: false, error: 'INVALID_DEVICE_CREDENTIAL', message: 'Missing device credentials.' });
     }
