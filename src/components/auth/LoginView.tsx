@@ -99,7 +99,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
           />
 
           {error && (
-            <p className="absolute left-0 top-[365px] w-[356px] text-center text-[11px] font-bold text-[#ff4d74]">
+            <p data-testid="login-error" className="absolute left-0 top-[365px] w-[356px] text-center text-[11px] font-bold text-[#ff4d74]">
               {error}
             </p>
           )}
