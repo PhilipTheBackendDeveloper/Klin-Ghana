@@ -163,12 +163,17 @@ export default async function handler(req: any, res?: any) {
     }
     seenMessageIds.add(data.messageId);
 
-    // Check sequence
+    // Check sequence (allow device reboot to reset sequence)
     const lastSeq = lastSequenceByDevice.get(devId);
     if (lastSeq !== undefined && data.sequence <= lastSeq) {
-      return sendResponse(409, { ok: false, error: 'STALE_SEQUENCE', message: 'Telemetry sequence is not newer than the last accepted packet.' });
+      if (data.sequence === 1 || lastSeq - data.sequence > 10) {
+        lastSequenceByDevice.set(devId, data.sequence);
+      } else {
+        return sendResponse(409, { ok: false, error: 'STALE_SEQUENCE', message: 'Telemetry sequence is not newer than the last accepted packet.' });
+      }
+    } else {
+      lastSequenceByDevice.set(devId, data.sequence);
     }
-    lastSequenceByDevice.set(devId, data.sequence);
 
     const evaluatedStatus = calculateStatus(data.fillPercentage);
     const nowIso = new Date().toISOString();
@@ -180,8 +185,11 @@ export default async function handler(req: any, res?: any) {
     if (sbUrl && sbKey) {
       try {
         const supabase = createClient(sbUrl, sbKey, { auth: { persistSession: false } });
-        const { data: bin } = await supabase.from('bins').select('id, name').eq('code', devId).maybeSingle();
+        const { data: bin } = await supabase.from('bins').select('id, name, latitude, longitude').eq('code', devId).maybeSingle();
         if (bin) {
+          const hasGpsData = Boolean(data.gpsFix && data.latitude != null && data.longitude != null && Number(data.latitude) !== 0 && Number(data.longitude) !== 0);
+          const finalLat = hasGpsData ? data.latitude : (bin.latitude || 6.6885);
+          const finalLng = hasGpsData ? data.longitude : (bin.longitude || -1.6244);
           const common = {
             bin_id: bin.id,
             device_id: devId,
@@ -191,9 +199,9 @@ export default async function handler(req: any, res?: any) {
             fill_status: evaluatedStatus,
             lid_state: data.lidState || 'CLOSED',
             wifi_rssi: data.wifiRssi,
-            latitude: data.gpsFix ? data.latitude : null,
-            longitude: data.gpsFix ? data.longitude : null,
-            gps_fix: data.gpsFix ?? false,
+            latitude: finalLat,
+            longitude: finalLng,
+            gps_fix: hasGpsData,
             gps_accuracy_m: data.gpsAccuracyM,
             satellites: data.satellites,
             firmware_version: data.firmwareVersion,
