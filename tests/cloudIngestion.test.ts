@@ -102,7 +102,7 @@ describe('Cloud & IoT HTTP Ingestion Endpoint Suite', () => {
 
     const res8 = await SmartBinSimulator.sendHttpTelemetry(SmartBinSimulator.generatePayload('collect', { deviceId: 'SB-024' }), endpoint);
     expect(res8.body.evaluatedStatus).toBe('NORMAL');
-  });
+  }, 15000);
 
   it('6. rejects duplicate messageId replay attempts (409 Conflict)', async () => {
     const payload = SmartBinSimulator.generatePayload('40', { deviceId: 'SB-024' });

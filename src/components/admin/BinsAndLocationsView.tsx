@@ -51,8 +51,8 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query));
   });
-  const gpsBins = filtered.filter((bin) => bin.gpsFix && Number.isFinite(bin.location.lat) && Number.isFinite(bin.location.lng) && bin.location.lat !== 0 && bin.location.lng !== 0);
-  const center: [number, number] = gpsBins[0] ? [gpsBins[0].location.lat, gpsBins[0].location.lng] : [5.6037, -0.1870];
+  const gpsBins = filtered.filter((bin) => Number.isFinite(bin.location.lat) && Number.isFinite(bin.location.lng) && bin.location.lat !== 0 && bin.location.lng !== 0);
+  const center: [number, number] = gpsBins[0] ? [gpsBins[0].location.lat, gpsBins[0].location.lng] : [6.6885, -1.6244];
 
   const selectBin = (bin: SmartBin) => {
     setSelectedBinId(bin.id);
@@ -110,7 +110,7 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
         <div className="flex h-[580px] flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm lg:col-span-7">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div>
-              <h3 className="font-['Outfit',sans-serif] text-sm font-bold text-slate-900">Accra East Bin Mesh</h3>
+              <h3 className="font-['Outfit',sans-serif] text-sm font-bold text-slate-900">Kumasi SmartBin Fleet Mesh</h3>
               <p className="text-[11px] text-slate-500">GPS clusters - Route handoff nodes - Active Layer: {selectedLayer}</p>
             </div>
             <span className="rounded bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-600">{filtered.length} Assets</span>
@@ -126,7 +126,8 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
                     <div className="p-1 text-xs">
                       <strong>{bin.code} - {bin.name}</strong>
                       <div className="mt-1 font-bold">Fill: {bin.currentFillLevel}%</div>
-                      <div>GPS fix: {bin.gpsAccuracyM ? `${bin.gpsAccuracyM}m` : 'confirmed'}</div>
+                      <div>Location: {bin.location.address || bin.location.city}</div>
+                      <div>GPS: {bin.gpsFix ? 'Confirmed Satellite Lock' : 'Awaiting Outdoor Lock (Hostel Bench)'}</div>
                       <button onClick={() => selectBin(bin)} className="mt-2 w-full rounded bg-blue-600 py-1 text-[10px] font-bold text-white">
                         Inspect Telemetry
                       </button>

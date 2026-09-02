@@ -99,7 +99,7 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
       ))}
 
       <div className="absolute left-[37px] top-[306px] h-[390px] w-[729px] overflow-hidden bg-white">
-        <h2 className="absolute left-[33px] top-[23px] w-[220px] text-[18px] font-bold leading-[1.18] text-[#3b82f6]">Accra East Bin Mesh</h2>
+        <h2 className="absolute left-[33px] top-[23px] w-[320px] text-[18px] font-bold leading-[1.18] text-[#3b82f6]">Kumasi SmartBin Mesh</h2>
         <p className="absolute left-[33px] top-[49px] w-[360px] text-[11px] font-medium leading-[1.18] text-[#8daac0]">
           Live asset positions and sensor event overlay
         </p>
@@ -131,7 +131,7 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
               <span className="absolute left-[9px] top-[11px] flex h-[53px] w-[53px] items-center justify-center rounded-[12px] text-[24px] font-black text-white shadow-lg" style={{ background: pinColor }}>K</span>
               <span className="absolute left-[46px] top-[22px] h-[36px] w-[130px] rounded-[10px] bg-slate-900/80 px-2 py-1 shadow" />
               <span className="absolute left-[54px] top-[25px] text-[11px] font-bold leading-[1.18] text-white">{bin.code}</span>
-              <span className="absolute left-[54px] top-[39px] text-[10px] font-semibold leading-[1.18] text-emerald-400">{formatPercent(bin.currentFillLevel)} ({bin.gpsFix ? 'GPS lock' : 'Bench'})</span>
+              <span className="absolute left-[54px] top-[39px] text-[10px] font-semibold leading-[1.18] text-emerald-400">{formatPercent(bin.currentFillLevel)} ({bin.gpsFix ? 'GPS lock' : 'Kumasi Hostel'})</span>
             </button>
           );
         })}
