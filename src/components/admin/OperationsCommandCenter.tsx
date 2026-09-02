@@ -75,7 +75,7 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
 
       {dataMode === 'live' && dataStatus !== 'ready' && (
         <div className="absolute left-[37px] top-[74px] z-10 w-[1086px] rounded-[12px] border border-blue-100 bg-blue-50 px-4 py-2 text-[11px] font-semibold text-blue-800">
-          {dataStatus === 'not_configured' ? dataError : `Live data status: ${dataStatus}`}
+          {dataError || `Live data status: ${dataStatus}`}
         </div>
       )}
 

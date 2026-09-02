@@ -229,25 +229,26 @@ export const SmartBinProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       supabase.from('alerts').select('*, bins(code, name)').neq('status', 'RESOLVED').neq('status', 'CLOSED').order('created_at', { ascending: false }).limit(50),
       supabase.from('complaints').select('*, bins(code, name, address)').order('created_at', { ascending: false }).limit(50),
       supabase.from('collections').select('*, bins(code, name, zone)').order('collected_at', { ascending: false }).limit(50),
-      supabase.from('route_stops').select('*, bins(code, name)').order('scheduled_time', { ascending: true }).limit(100),
+      supabase.from('route_stops').select('*, bins(code, name)').order('created_at', { ascending: true }).limit(100),
     ]);
 
-    const firstError = binsResult.error || alertsResult.error || complaintsResult.error || collectionsResult.error || routesResult.error;
-    if (firstError) {
+    if (binsResult.error) {
       setDataStatus('error');
-      setDataError(firstError.message);
+      setDataError(`Bins query failed: ${binsResult.error.message}`);
       return;
     }
 
     const mappedBins = mapBinRows(binsResult.data || []);
     setBins(mappedBins);
-    setAlerts(mapAlertRows(alertsResult.data || []));
-    setCitizenReports(mapComplaintRows(complaintsResult.data || []));
-    setCollections(mapCollectionRows(collectionsResult.data || []));
-    setRouteStops(mapRouteRows(routesResult.data || []));
+    if (!alertsResult.error) setAlerts(mapAlertRows(alertsResult.data || []));
+    if (!complaintsResult.error) setCitizenReports(mapComplaintRows(complaintsResult.data || []));
+    if (!collectionsResult.error) setCollections(mapCollectionRows(collectionsResult.data || []));
+    if (!routesResult.error) setRouteStops(mapRouteRows(routesResult.data || []));
+
     setSelectedBinId((current) => current || mappedBins[0]?.id || null);
     setLastTelemetryTime(mappedBins.find((bin) => bin.lastUpdated)?.lastUpdated || new Date(0).toISOString());
     setDataStatus('ready');
+    setDataError(null);
   };
 
   useEffect(() => {

@@ -98,7 +98,7 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
 
         {dataMode === 'live' && dataStatus !== 'ready' && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-            <span>{dataStatus === 'not_configured' ? dataError : `Live data status: ${dataStatus}`}</span>
+            <span>{dataError || `Live data status: ${dataStatus}`}</span>
             <button type="button" onClick={refreshLiveData} className="inline-flex items-center gap-1 font-bold text-blue-700">
               <RefreshCw className="h-3.5 w-3.5" /> Refresh
             </button>
