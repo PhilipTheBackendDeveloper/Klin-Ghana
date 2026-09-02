@@ -101,9 +101,9 @@ const uiStatusFromDb = (state: any): SmartBin['status'] => {
 
 const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
   const state = Array.isArray(row.bin_current_state) ? row.bin_current_state[0] : row.bin_current_state;
-  const hasGpsFix = Boolean(state?.gps_fix && state?.latitude != null && state?.longitude != null);
-  const latitude = hasGpsFix ? Number(state.latitude) : 0;
-  const longitude = hasGpsFix ? Number(state.longitude) : 0;
+  const hasGpsFix = Boolean(state?.gps_fix && state?.latitude != null && state?.longitude != null && Number(state.latitude) !== 0 && Number(state.longitude) !== 0);
+  const latitude = hasGpsFix ? Number(state.latitude) : (row.latitude ? Number(row.latitude) : 5.6037);
+  const longitude = hasGpsFix ? Number(state.longitude) : (row.longitude ? Number(row.longitude) : -0.1870);
   return {
     id: row.id,
     code: row.code,
@@ -113,8 +113,8 @@ const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
     location: {
       lat: latitude,
       lng: longitude,
-      address: hasGpsFix ? (row.address || 'GPS verified location') : 'Awaiting GPS fix',
-      city: row.city || 'Unknown',
+      address: hasGpsFix ? (row.address || 'GPS verified location') : 'Accra Facility (Awaiting satellite lock)',
+      city: row.city || 'Accra',
       landmark: row.zone || undefined,
     },
     status: uiStatusFromDb(state),

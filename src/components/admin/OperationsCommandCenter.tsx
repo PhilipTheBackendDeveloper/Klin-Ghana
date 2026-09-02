@@ -109,33 +109,29 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
         </button>
         <img alt="Accra East street map" src="/figma-assets/operations-map.jpeg" className="absolute left-[48px] top-[89px] h-[272px] w-[631px] object-cover opacity-70" />
 
-        {mapBins.filter((b) => b.gpsFix && b.location.lat !== 0 && b.location.lng !== 0).length === 0 && (
+        {mapBins.length === 0 && (
           <div className="absolute left-[118px] top-[184px] w-[492px] rounded-[15px] border border-dashed border-[#8daac0] bg-white/95 p-5 text-center text-[12px] text-[#587187]">
-            <div className="text-[16px] font-bold text-[#0b1f1a]">
-              {bins.length === 0 ? 'No live bins registered' : 'Awaiting GPS fix'}
-            </div>
-            <p className="mt-1">
-              {bins.length === 0
-                ? 'Supabase returned zero bins.'
-                : 'Physical bin SB-024 is registered. Live map marker will appear once the GPS receiver acquires satellite fix.'}
-            </p>
+            <div className="text-[16px] font-bold text-[#0b1f1a]">No live bins registered</div>
+            <p className="mt-1">Supabase returned zero bins.</p>
           </div>
         )}
 
-        {mapBins.filter((b) => b.gpsFix && b.location.lat !== 0 && b.location.lng !== 0).map((bin, index) => {
+        {mapBins.map((bin, index) => {
           const positions = [
-            { x: 91, y: 133, color: '#ff4d74' },
-            { x: 317, y: 225, color: '#ffb23e' },
-            { x: 86, y: 274, color: '#18d8ff' },
-            { x: 450, y: 118, color: '#21e6a2' },
-          ][index] || { x: 91, y: 133, color: '#21e6a2' };
+            { x: 260, y: 150 },
+            { x: 91, y: 133 },
+            { x: 317, y: 225 },
+            { x: 86, y: 274 },
+            { x: 450, y: 118 },
+          ][index] || { x: 260, y: 150 };
+          const pinColor = bin.currentFillLevel >= 95 ? '#ff4d74' : bin.currentFillLevel >= 80 ? '#ffb23e' : '#10b981';
           return (
-            <button key={bin.id} type="button" onClick={() => selectBin(bin)} className="figma-button-hit absolute h-[78px] w-[160px] text-left" style={{ left: positions.x, top: positions.y }}>
-              <span className="absolute left-0 top-0 h-[78px] w-[77px] rounded-full opacity-30" style={{ background: positions.color }} />
-              <span className="absolute left-[9px] top-[11px] flex h-[53px] w-[53px] items-center justify-center rounded-[12px] text-[24px] font-black text-white" style={{ background: positions.color }}>K</span>
-              <span className="absolute left-[36px] top-[24px] h-[35px] w-[129px] rounded-[15px] bg-[#ff4d74]/40" />
-              <span className="absolute left-[59px] top-[29px] w-[84px] text-[12px] font-bold leading-[1.18] text-white">{bin.code}</span>
-              <span className="absolute left-[53px] top-[43px] w-[160px] text-[10px] font-medium leading-[1.18] text-[#52675f]">{bin.name} - {formatPercent(bin.currentFillLevel)}</span>
+            <button key={bin.id} type="button" onClick={() => selectBin(bin)} className="figma-button-hit absolute h-[78px] w-[180px] text-left" style={{ left: positions.x, top: positions.y }}>
+              <span className="absolute left-0 top-0 h-[78px] w-[77px] rounded-full opacity-25" style={{ background: pinColor }} />
+              <span className="absolute left-[9px] top-[11px] flex h-[53px] w-[53px] items-center justify-center rounded-[12px] text-[24px] font-black text-white shadow-lg" style={{ background: pinColor }}>K</span>
+              <span className="absolute left-[46px] top-[22px] h-[36px] w-[130px] rounded-[10px] bg-slate-900/80 px-2 py-1 shadow" />
+              <span className="absolute left-[54px] top-[25px] text-[11px] font-bold leading-[1.18] text-white">{bin.code}</span>
+              <span className="absolute left-[54px] top-[39px] text-[10px] font-semibold leading-[1.18] text-emerald-400">{formatPercent(bin.currentFillLevel)} ({bin.gpsFix ? 'GPS lock' : 'Bench'})</span>
             </button>
           );
         })}
