@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 font-['Plus_Jakarta_Sans',sans-serif];
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-['Outfit',sans-serif] tracking-tight;
+  }
+}
+
+/* Custom Glassmorphism & UI Accents */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-hover {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-panel-hover:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(16, 185, 129, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -10px rgba(16, 185, 129, 0.15);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.4);
+}
+
+.glow-danger {
+  box-shadow: 0 0 25px -5px rgba(244, 63, 94, 0.4);
+}
+
+.glow-amber {
+  box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.4);
+}
+
+.glow-smart {
+  box-shadow: 0 0 25px -5px rgba(14, 165, 233, 0.4);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.8);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.6);
+}
+
+/* Leaflet Map Styling Override for Dark Mode */
+.leaflet-container {
+  background: #090d16 !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  border-radius: 1rem;
+}
+.leaflet-popup-content-wrapper {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+.leaflet-popup-tip {
+  background: #0f172a !important;
+}
+
+/* Figma source-of-truth tokens and fixed-frame helpers */
+:root {
+  --smartbin-blue: #3b82f6;
+  --smartbin-brand-blue: #1174e6;
+  --smartbin-bg: #f6f6f6;
+  --smartbin-primary: #0b1f1a;
+  --smartbin-secondary: #52675f;
+  --smartbin-muted: #8daac0;
+  --smartbin-label: #587187;
+  --smartbin-green: #047857;
+  --smartbin-success: #21e6a2;
+  --smartbin-cyan: #18d8ff;
+  --smartbin-danger: #ff4d74;
+  --smartbin-warning: #ffb23e;
+  --smartbin-subtle: #eef4f2;
+  --smartbin-border: #d8e4e0;
+}
+
+body {
+  background: var(--smartbin-bg);
+  color: var(--smartbin-primary);
+  font-family: "DM Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "DM Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+.figma-login-stage {
+  min-height: 100vh;
+  background: #fff;
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+}
+
+.figma-page-wrap {
+  min-height: 100vh;
+  background: var(--smartbin-bg);
+  overflow: auto;
+}
+
+.figma-stage {
+  position: relative;
+  width: 1440px;
+  min-height: 1040px;
+  background: var(--smartbin-bg);
+  color: var(--smartbin-primary);
+  font-family: "DM Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+  transform-origin: top left;
+}
+
+.figma-admin-content {
+  position: absolute;
+  left: 219px;
+  top: 125px;
+  width: 1155px;
+}
+
+.figma-button-hit {
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.figma-button-hit:hover { filter: brightness(0.98); }
+.figma-button-hit:active { transform: translateY(1px); }

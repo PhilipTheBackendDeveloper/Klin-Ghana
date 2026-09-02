@@ -1,0 +1,4 @@
+project_id = "ufnwwgilqxvjrzrmydes"
+
+[functions.iot-telemetry]
+verify_jwt = false
