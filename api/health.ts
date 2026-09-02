@@ -14,11 +14,18 @@ export default async function handler(req: any, res?: any) {
     return;
   }
 
-  let dbStatus = 'connected';
+  let dbStatus = 'unconfigured';
   try {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    if (!supabaseUrl) {
-      dbStatus = 'unconfigured';
+    const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    if (supabaseUrl && supabaseKey) {
+      const pingRes = await fetch(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/bins?select=code&limit=1`, {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+      });
+      dbStatus = pingRes.ok ? 'connected' : 'unreachable';
     }
   } catch {
     dbStatus = 'disconnected';
