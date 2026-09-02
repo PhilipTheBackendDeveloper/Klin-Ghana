@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertTriangle, Route, Trash2, ArrowUpRight, Activity, MapPin } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { SmartBin } from '../../types';
 import { useSmartBin } from '../../context/SmartBinContext';
@@ -46,10 +46,10 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
   } = useSmartBin();
 
   const targetBin = selectedBin;
-  const mapBins = bins.slice(0, 4);
+  const mapBins = bins.slice(0, 8);
   const gpsBins = mapBins.filter((b) => Number.isFinite(b.location.lat) && Number.isFinite(b.location.lng) && b.location.lat !== 0 && b.location.lng !== 0);
   const mapCenter: [number, number] = gpsBins[0] ? [gpsBins[0].location.lat, gpsBins[0].location.lng] : [6.6885, -1.6244];
-  const shownReports = citizenReports.filter((report) => report.status !== 'Resolved' && report.status !== 'Closed').slice(0, 3);
+  const shownReports = citizenReports.filter((report) => report.status !== 'Resolved' && report.status !== 'Closed').slice(0, 4);
   const shownAlerts = alerts.filter((alert) => !alert.read).slice(0, 3);
   const collectedStops = routeStops.filter((stop) => stop.status === 'COLLECTED').length;
 
@@ -59,154 +59,315 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
   };
 
   const kpis = [
-    { label: 'FLEET HEALTH', value: `${fleetHealth.toFixed(1)}%`, x: 35, w: 235, dot: '#21e6a2' },
-    { label: 'OVERFLOW', value: String(overflowCount), x: 301, w: 235, dot: '#ff4d74' },
-    { label: 'OFFLINE', value: String(offlineCount), x: 566, w: 169, dot: '#6b86ff' },
-    { label: 'SLA RISK', value: String(slaRiskCount), x: 751, w: 169, dot: '#ffb23e' },
-    { label: 'ROUTE LOAD', value: `${routeLoad}%`, x: 938, w: 169, dot: '#18d8ff' },
+    { label: 'FLEET HEALTH', value: `${fleetHealth.toFixed(1)}%`, dot: '#21e6a2', route: '/admin/bins', textColor: 'text-emerald-600' },
+    { label: 'OVERFLOW', value: String(overflowCount), dot: '#ff4d74', route: '/admin/alerts', textColor: overflowCount > 0 ? 'text-rose-600' : 'text-slate-900' },
+    { label: 'OFFLINE', value: String(offlineCount), dot: '#6b86ff', route: '/admin/bins', textColor: offlineCount > 0 ? 'text-indigo-600' : 'text-slate-900' },
+    { label: 'SLA RISK', value: String(slaRiskCount), dot: '#ffb23e', route: '/admin/complaints', textColor: slaRiskCount > 0 ? 'text-amber-600' : 'text-slate-900' },
+    { label: 'ROUTE LOAD', value: `${routeLoad}%`, dot: '#18d8ff', route: '/admin/routes', textColor: 'text-cyan-600' },
   ];
 
   return (
-    <section className="relative h-[903px] w-[1155px]" data-node-id="64:2" data-name="Operations Command Center">
-      <h1 className="absolute left-[43px] top-0 w-[440px] text-[30px] font-bold leading-[1.18] text-[#0b1f1a]">Operations Command Center</h1>
-      <p className="absolute left-[45px] top-[42px] w-[620px] text-[12px] font-medium leading-[1.18] text-[#0b1f1a]/70">
-        Accra East smart-bin fleet, complaint pressure and collection readiness
-      </p>
+    <section className="w-full space-y-6 font-['Plus_Jakarta_Sans',sans-serif]">
+      {/* Header & Live Status Badges */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-['Outfit',sans-serif] text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Operations Command Center
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Kumasi fleet telemetry, real-time GPS tracking & citizen response status
+          </p>
+        </div>
 
-      <button type="button" onClick={refreshLiveData} className="figma-button-hit absolute left-[783px] top-[13px] h-[23px] w-[110px] rounded-[13px] border border-[#21e6a2]">
-        <span className="absolute left-[10px] top-[8px] h-[7px] w-[8px] rounded-full bg-[#21e6a2]" />
-        <span className="absolute left-[24px] top-[5px] text-[10px] font-bold leading-[1.18] text-[#21e6a2]">{dataMode === 'demo' ? 'Demo data' : dataStatus}</span>
-      </button>
-      <div className="absolute left-[905px] top-[13px] h-[23px] w-[98px] rounded-[13px] border border-[#18d8ff]">
-        <span className="absolute left-[10px] top-[8px] h-[7px] w-[8px] rounded-full bg-[#18d8ff]" />
-        <span className="absolute left-[24px] top-[5px] text-[10px] font-bold leading-[1.18] text-[#18d8ff]">{bins.some((bin) => bin.gpsFix) ? 'GPS sync' : 'No GPS'}</span>
-      </div>
-      <div className="absolute left-[1015px] top-[13px] h-[23px] w-[108px] rounded-[13px] border border-[#8daac0]">
-        <span className="absolute left-[10px] top-[8px] h-[7px] w-[8px] rounded-full bg-[#8daac0]" />
-        <span className="absolute left-[24px] top-[5px] text-[10px] font-bold leading-[1.18] text-[#8daac0]">{formatTime(lastTelemetryTime)}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Live / Demo Badge */}
+          <button
+            type="button"
+            onClick={refreshLiveData}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{dataMode === 'demo' ? 'Demo data' : dataStatus}</span>
+          </button>
+
+          {/* GPS Sync Badge */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-cyan-300 bg-cyan-50 text-cyan-700 text-xs font-bold">
+            <span className="w-2 h-2 rounded-full bg-cyan-500" />
+            <span>{bins.some((bin) => bin.gpsFix) ? 'GPS sync' : 'No GPS'}</span>
+          </div>
+
+          {/* Telemetry Timestamp Badge */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-500 text-xs font-medium shadow-2xs">
+            <Activity className="w-3.5 h-3.5 text-slate-400" />
+            <span>{formatTime(lastTelemetryTime)}</span>
+          </div>
+        </div>
       </div>
 
+      {/* Live Data Error Notification */}
       {dataMode === 'live' && dataStatus !== 'ready' && (
-        <div className="absolute left-[37px] top-[74px] z-10 w-[1086px] rounded-[12px] border border-blue-100 bg-blue-50 px-4 py-2 text-[11px] font-semibold text-blue-800">
-          {dataError || `Live data status: ${dataStatus}`}
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-800 shadow-xs">
+          <span>{dataError || `Live data status: ${dataStatus}`}</span>
+          <button type="button" onClick={refreshLiveData} className="inline-flex items-center gap-1 font-bold text-blue-700 hover:underline">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
         </div>
       )}
 
-      {kpis.map((kpi) => (
-        <button
-          type="button"
-          key={kpi.label}
-          onClick={() => {
-            if (kpi.label === 'OVERFLOW') window.location.hash = '/admin/alerts';
-            if (kpi.label === 'OFFLINE') window.location.hash = '/admin/bins';
-            if (kpi.label === 'SLA RISK') window.location.hash = '/admin/complaints';
-            if (kpi.label === 'ROUTE LOAD') window.location.hash = '/admin/routes';
-          }}
-          className="figma-button-hit absolute top-[102px] h-[123px] overflow-hidden rounded-[15px] bg-white text-left"
-          style={{ left: kpi.x, width: kpi.w }}
-        >
-          <span className="absolute left-[21px] top-[18px] text-[9px] font-bold leading-[1.18] text-[#587187]">{kpi.label}</span>
-          <span className="absolute left-[21px] top-[47px] text-[26px] font-bold leading-[1.18] text-black">{kpi.value}</span>
-          <span className="absolute right-[21px] top-[20px] h-[9px] w-[9px] rounded-full" style={{ background: kpi.dot }} />
-        </button>
-      ))}
+      {/* KPI Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        {kpis.map((kpi) => (
+          <button
+            type="button"
+            key={kpi.label}
+            onClick={() => { window.location.hash = kpi.route; }}
+            className="group flex flex-col justify-between p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all text-left"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">{kpi.label}</span>
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: kpi.dot }} />
+            </div>
+            <div className={`font-['Outfit',sans-serif] mt-2 text-2xl sm:text-3xl font-black ${kpi.textColor}`}>
+              {kpi.value}
+            </div>
+          </button>
+        ))}
+      </div>
 
-      <div className="absolute left-[37px] top-[306px] h-[390px] w-[729px] overflow-hidden rounded-[15px] border border-slate-200/80 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-          <div>
-            <h2 className="text-[17px] font-bold text-slate-900 font-['Outfit',sans-serif]">Kumasi SmartBin Fleet Mesh</h2>
-            <p className="text-[11px] text-slate-500">Live GPS tracking & sensor telemetry overlay</p>
+      {/* Middle Section: Live Fleet Map + Selected Asset Telemetry */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Map Container */}
+        <div className="lg:col-span-8 flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="font-['Outfit',sans-serif] text-base sm:text-lg font-bold text-slate-900">
+                Kumasi SmartBin Fleet Mesh
+              </h2>
+              <p className="text-[11px] text-slate-500">Live GPS tracking & sensor telemetry overlay</p>
+            </div>
+            <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 font-mono text-xs font-bold text-emerald-700">
+              {bins.length} Assets Active
+            </span>
           </div>
-          <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[11px] font-bold text-emerald-700">
-            {bins.length} Active Bins
-          </span>
+
+          <div className="relative mt-3 h-[320px] sm:h-[380px] w-full overflow-hidden rounded-2xl border border-slate-200 shadow-inner">
+            <MapContainer center={mapCenter} zoom={13} scrollWheelZoom={false} className="h-full w-full">
+              <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              {gpsBins[0] && <MapRecenter center={[gpsBins[0].location.lat, gpsBins[0].location.lng]} />}
+              {gpsBins.map((bin) => (
+                <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]} eventHandlers={{ click: () => selectBin(bin) }}>
+                  <Popup>
+                    <div className="p-1 text-xs">
+                      <strong>{bin.code} - {bin.name}</strong>
+                      <div className="mt-1 font-bold text-emerald-600">Fill: {bin.currentFillLevel}%</div>
+                      <div>Location: {bin.location.address || bin.location.city}</div>
+                      <div className="text-[10px] text-slate-500 mt-1">{bin.gpsFix ? 'Confirmed Satellite Lock' : 'Bench Location'}</div>
+                      <button onClick={() => selectBin(bin)} className="mt-2 w-full rounded bg-blue-600 py-1 text-[10px] font-bold text-white">
+                        Inspect Telemetry
+                      </button>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          </div>
         </div>
 
-        <div className="relative mt-2 h-[305px] w-full overflow-hidden rounded-xl border border-slate-200 shadow-inner">
-          <MapContainer center={mapCenter} zoom={13} scrollWheelZoom={false} className="h-full w-full">
-            <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            {gpsBins[0] && <MapRecenter center={[gpsBins[0].location.lat, gpsBins[0].location.lng]} />}
-            {gpsBins.map((bin) => (
-              <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]} eventHandlers={{ click: () => selectBin(bin) }}>
-                <Popup>
-                  <div className="p-1 text-xs">
-                    <strong>{bin.code} - {bin.name}</strong>
-                    <div className="mt-1 font-bold text-emerald-600">Fill: {bin.currentFillLevel}%</div>
-                    <div>Location: {bin.location.address || bin.location.city}</div>
-                    <div className="text-[10px] text-slate-500 mt-1">{bin.gpsFix ? 'Confirmed Satellite Lock' : 'Bench Location'}</div>
-                    <button onClick={() => selectBin(bin)} className="mt-2 w-full rounded bg-blue-600 py-1 text-[10px] font-bold text-white">
-                      Inspect Telemetry
-                    </button>
+        {/* Right Column: Selected Asset Details & Incident Queue */}
+        <div className="lg:col-span-4 space-y-4 flex flex-col">
+          {/* Selected Asset Card */}
+          <div className="p-5 rounded-3xl border border-slate-200/80 bg-white shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Selected Asset</span>
+              {targetBin && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                  {targetBin.status}
+                </span>
+              )}
+            </div>
+
+            {targetBin ? (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => selectBin(targetBin)}
+                  className="w-full text-left group"
+                >
+                  <div className="text-base sm:text-lg font-bold text-blue-600 group-hover:underline">
+                    {targetBin.code} - {targetBin.name}
                   </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
+                  <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{targetBin.location.address || targetBin.location.city}</span>
+                  </div>
+                </button>
+
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                    <div className="text-[10px] font-bold text-slate-400">Fill level</div>
+                    <div className="text-base font-black text-rose-500 mt-0.5">{targetBin.currentFillLevel}%</div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                    <div className="text-[10px] font-bold text-slate-400">Battery</div>
+                    <div className="text-base font-black text-emerald-600 mt-0.5">
+                      {targetBin.batteryLevel == null ? 'N/A' : `${targetBin.batteryLevel}%`}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                    <div className="text-[10px] font-bold text-slate-400">RSSI</div>
+                    <div className="text-base font-black text-slate-700 mt-0.5">
+                      {targetBin.wifiSignal == null ? 'N/A' : `${targetBin.wifiSignal} dBm`}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                    <div className="text-[10px] font-bold text-slate-400">GPS</div>
+                    <div className="text-base font-black text-emerald-600 mt-0.5">
+                      {targetBin.gpsFix ? 'Fix' : 'No fix'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-xs text-slate-400">
+                No asset selected.
+              </div>
+            )}
+          </div>
+
+          {/* Incident Queue Card */}
+          <div className="p-5 rounded-3xl border border-slate-200/80 bg-white shadow-xs flex-1">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+              <h3 className="font-['Outfit',sans-serif] text-sm font-bold text-blue-600">Incident Queue</h3>
+              <button
+                type="button"
+                onClick={() => { window.location.hash = '/admin/alerts'; }}
+                className="text-[11px] font-bold text-blue-600 hover:underline inline-flex items-center gap-0.5"
+              >
+                View all <ArrowUpRight className="w-3 h-3" />
+              </button>
+            </div>
+
+            {shownAlerts.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400">No unresolved live alerts.</div>
+            ) : (
+              <div className="space-y-2">
+                {shownAlerts.map((alert) => (
+                  <button
+                    key={alert.id}
+                    type="button"
+                    onClick={() => { window.location.hash = '/admin/alerts'; }}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-left transition-colors flex items-center justify-between gap-2"
+                  >
+                    <div className="truncate">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700">
+                          {alert.severity === 'danger' ? 'P1' : 'P2'}
+                        </span>
+                        <span className="text-xs font-bold text-slate-800 truncate">{alert.binCode}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">{alert.message}</p>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400 shrink-0">{formatTime(alert.timestamp)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="absolute left-[810px] top-[302px] h-[214px] w-[345px] overflow-hidden rounded-[15px] bg-white text-left">
-        {targetBin ? (
-          <button type="button" onClick={() => selectBin(targetBin)} className="figma-button-hit h-full w-full text-left">
-            <span className="absolute left-[10px] top-[24px] text-[10px] font-bold leading-[1.18] text-[#587187]">Selected Asset</span>
-            <span className="absolute left-[10px] top-[42px] w-[220px] text-[18px] font-bold leading-[1.18] text-[#3b82f6]">{targetBin.code} - {targetBin.name}</span>
-            <span className="absolute left-[232px] top-[42px] h-[26px] w-[104px] rounded-[13px] border border-[#ff4d74]" />
-            <span className="absolute left-[249px] top-[52px] h-[8px] w-[8px] rounded-full bg-[#ff4d74]" />
-            <span className="absolute left-[263px] top-[49px] text-[10px] font-bold leading-[1.18] text-[#ff4d74]">{targetBin.status}</span>
-            {[
-              ['Fill level', `${targetBin.currentFillLevel}%`, '#ff4d74', 4, 96],
-              ['Battery', targetBin.batteryLevel == null ? 'N/A' : `${targetBin.batteryLevel}%`, '#21e6a2', 162, 96],
-              ['RSSI', targetBin.wifiSignal == null ? 'N/A' : `${targetBin.wifiSignal} dBm`, '#35101c', 4, 158],
-              ['GPS', targetBin.gpsFix ? 'Fix' : 'No fix', '#21e6a2', 162, 158],
-            ].map(([label, value, color, x, y]) => (
-              <span key={label} className="absolute h-[44px] w-[140px] rounded-[8px] border border-[#d8e4e0] bg-[#eef4f2]" style={{ left: Number(x), top: Number(y) }}>
-                <span className="absolute left-[12px] top-[9px] text-[9px] font-bold leading-[1.18] text-[#587187]">{label}</span>
-                <span className="absolute left-[12px] top-[24px] text-[12px] font-bold leading-[1.18]" style={{ color: String(color) }}>{value}</span>
-              </span>
-            ))}
-          </button>
-        ) : (
-          <div className="p-6 text-sm text-[#587187]">
-            <div className="text-[10px] font-bold uppercase">Selected Asset</div>
-            <div className="mt-4 text-[18px] font-bold text-[#0b1f1a]">No asset selected</div>
-            <p className="mt-2 text-[12px]">Live mode has no bins to inspect yet.</p>
+      {/* Bottom Section: Recent Complaints Table + Collection Route Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Complaints Table */}
+        <div className="lg:col-span-8 p-5 rounded-3xl border border-slate-200/80 bg-white shadow-xs">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+            <div>
+              <h3 className="font-['Outfit',sans-serif] text-base font-bold text-slate-900">Recent Citizen Reports</h3>
+              <p className="text-[11px] text-slate-500">Live issues submitted through the citizen portal</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = '/admin/complaints'; }}
+              className="text-xs font-bold text-blue-600 hover:underline"
+            >
+              View Workbench &rarr;
+            </button>
           </div>
-        )}
-      </div>
 
-      <div className="absolute left-[810px] top-[531px] h-[201px] w-[345px] overflow-hidden rounded-[15px] bg-white">
-        <h2 className="absolute left-[19px] top-[4px] text-[18px] font-bold leading-[1.18] text-[#3b82f6]">Incident Queue</h2>
-        {shownAlerts.length === 0 && <span className="absolute left-[19px] top-[62px] w-[300px] text-[12px] text-[#8daac0]">No unresolved live alerts.</span>}
-        {shownAlerts.map((alert, index) => (
-          <button key={alert.id} type="button" onClick={() => { window.location.hash = '/admin/alerts'; }} className="figma-button-hit absolute left-[19px] h-[40px] w-[316px] rounded-[8px] bg-[#eef4f2] text-left" style={{ top: 42 + index * 52 }}>
-            <span className="absolute left-[14px] top-[11px] text-[10px] font-bold leading-[1.18] text-[#ff4d74]">{alert.severity === 'danger' ? 'P1' : 'P2'}</span>
-            <span className="absolute left-[48px] top-[7px] w-[220px] text-[11px] font-bold leading-[1.18] text-[#52675f]">{alert.message.slice(0, 34)}</span>
-            <span className="absolute left-[48px] top-[22px] w-[130px] text-[9px] font-medium leading-[1.18] text-[#8daac0]">{alert.binCode} - {formatTime(alert.timestamp)}</span>
-          </button>
-        ))}
-      </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <th className="py-2 px-2">Ticket</th>
+                  <th className="py-2 px-2">Location</th>
+                  <th className="py-2 px-2">Issue</th>
+                  <th className="py-2 px-2">Status</th>
+                  <th className="py-2 px-2">Reporter</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {shownReports.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-slate-400">No unresolved citizen complaints.</td>
+                  </tr>
+                ) : (
+                  shownReports.map((report) => (
+                    <tr
+                      key={report.id}
+                      onClick={() => { window.location.hash = '/admin/complaints'; }}
+                      className="hover:bg-slate-50/80 cursor-pointer transition-colors"
+                    >
+                      <td className="py-2.5 px-2 font-bold text-blue-600 font-mono">#{report.id}</td>
+                      <td className="py-2.5 px-2 font-medium text-slate-800 truncate max-w-[160px]">{report.binName || report.locationText}</td>
+                      <td className="py-2.5 px-2 text-slate-600">{report.issueType}</td>
+                      <td className="py-2.5 px-2">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          {report.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-slate-500">{report.reportedBy}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-      <button type="button" onClick={() => { window.location.hash = '/admin/routes'; }} className="figma-button-hit absolute left-[810px] top-[755px] h-[148px] w-[345px] overflow-hidden rounded-[15px] bg-white text-left">
-        <h2 className="absolute left-[38px] top-[5px] text-[16px] font-bold leading-[1.18] text-[#3b82f6]">Collection Route</h2>
-        <span className="absolute left-[38px] top-[39px] h-[6px] rounded-[3px] bg-[#21e6a2]" style={{ width: `${Math.max(4, Math.min(237, routeLoad * 2.37))}px` }} />
-        <span className="absolute left-[38px] top-[61px] w-[270px] text-[10px] font-medium leading-[1.18] text-[#8daac0]">{routeStops.length === 0 ? 'No active route stops' : `${collectedStops}/${routeStops.length} stops collected`}</span>
-      </button>
+        {/* Collection Route Progress Card */}
+        <div className="lg:col-span-4 p-5 rounded-3xl border border-slate-200/80 bg-white shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+              <h3 className="font-['Outfit',sans-serif] text-base font-bold text-slate-900">Collection Route</h3>
+              <button
+                type="button"
+                onClick={() => { window.location.hash = '/admin/routes'; }}
+                className="text-xs font-bold text-blue-600 hover:underline"
+              >
+                Manage &rarr;
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">Active automated dispatch load across Kumasi nodes.</p>
 
-      <div className="absolute left-[37px] top-[736px] h-[157px] w-[729px] overflow-hidden rounded-[10px] bg-white">
-        {['TICKET', 'LOCATION', 'ISSUE', 'STATUS', 'REPORTER'].map((head, index) => (
-          <span key={head} className="absolute top-[7px] text-[8px] font-bold leading-[1.18] text-black/30" style={{ left: [34, 136, 294, 430, 570][index] }}>{head}</span>
-        ))}
-        <span className="absolute left-[32px] top-[33px] h-px w-[666px] bg-black/5" />
-        {shownReports.length === 0 && <span className="absolute left-[34px] top-[58px] text-[12px] text-[#8daac0]">No unresolved citizen complaints.</span>}
-        {shownReports.map((report, index) => (
-          <button key={report.id} type="button" onClick={() => { window.location.hash = '/admin/complaints'; }} className="figma-button-hit absolute left-0 h-[37px] w-[729px] text-left" style={{ top: 45 + index * 42 }}>
-            <span className="absolute left-[34px] top-0 w-[76px] text-[11px] font-bold leading-[1.18] text-[#3b82f6]">#{report.id}</span>
-            <span className="absolute left-[136px] top-0 w-[140px] text-[11px] font-medium leading-[1.18] text-[#3b82f6]">{report.binName || report.locationText}</span>
-            <span className="absolute left-[294px] top-0 w-[92px] text-[11px] font-medium leading-[1.18] text-[#3b82f6]">{report.issueType}</span>
-            <span className="absolute left-[430px] top-0 w-[90px] text-[11px] font-bold leading-[1.18] text-[#ff4d74]">{report.status}</span>
-            <span className="absolute left-[570px] top-0 w-[110px] text-[11px] font-medium leading-[1.18] text-[#3b82f6]">{report.reportedBy}</span>
-          </button>
-        ))}
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-slate-600">Route Load</span>
+                <span className="text-cyan-600">{routeLoad}%</span>
+              </div>
+              <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, routeLoad)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>{routeStops.length === 0 ? 'No active route stops' : `${collectedStops}/${routeStops.length} stops collected`}</span>
+            <Route className="w-4 h-4 text-slate-400" />
+          </div>
+        </div>
       </div>
     </section>
   );

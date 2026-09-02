@@ -26,6 +26,7 @@ export const App: React.FC = () => {
   const { bins, setSelectedBinId } = useSmartBin();
   const [currentRoute, setCurrentRoute] = useState('/admin');
   const [selectedBin, setSelectedBin] = useState<SmartBin | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const handleHashChange = () => setCurrentRoute(window.location.hash.replace('#', '') || '/admin');
@@ -121,15 +122,15 @@ export const App: React.FC = () => {
 
   if (currentRoute.startsWith('/user')) {
     return (
-      <div className="figma-page-wrap bg-white">
+      <div className="min-h-screen bg-white">
         {currentRoute === '/user/report' && <UserReportView onReportSuccess={() => navigateTo('/user/complaints')} />}
-        {currentRoute === '/user/bins' && <main className="mx-auto w-full max-w-5xl p-6"><UserBinsView onSelectBin={(bin) => openBin(bin, '/user/bins')} /></main>}
+        {currentRoute === '/user/bins' && <main className="mx-auto w-full max-w-5xl p-4 sm:p-6"><UserBinsView onSelectBin={(bin) => openBin(bin, '/user/bins')} /></main>}
         {currentRoute.startsWith('/user/bins/') && (
-          <main className="mx-auto w-full max-w-5xl p-6">
+          <main className="mx-auto w-full max-w-5xl p-4 sm:p-6">
             {activeBin ? <UserBinDetailView bin={activeBin} onBack={() => navigateTo('/user/bins')} onReportProblem={() => navigateTo('/user/report')} /> : <EmptyDetail onBack={() => navigateTo('/user/bins')} label="No live bin selected" />}
           </main>
         )}
-        {currentRoute === '/user/complaints' && <main className="mx-auto w-full max-w-5xl p-6"><UserComplaintsView /></main>}
+        {currentRoute === '/user/complaints' && <main className="mx-auto w-full max-w-5xl p-4 sm:p-6"><UserComplaintsView /></main>}
       </div>
     );
   }
@@ -145,25 +146,31 @@ export const App: React.FC = () => {
     currentRoute === '/admin/ai' ? 'ai' : 'command-center';
 
   return (
-    <div className="figma-page-wrap">
-      <div className="figma-stage">
-        <FigmaSidebar
-          currentView={currentAdminNav}
-          onSelectView={(viewId) => {
-            if (viewId === 'command-center') navigateTo('/admin');
-            if (viewId === 'bins-locations') navigateTo('/admin/bins');
-            if (viewId === 'device-detail') navigateTo(activeBin ? `/admin/bins/${activeBin.code}` : '/admin/bins');
-            if (viewId === 'alerts') navigateTo('/admin/alerts');
-            if (viewId === 'complaints') navigateTo('/admin/complaints');
-            if (viewId === 'routes') navigateTo('/admin/routes');
-            if (viewId === 'analytics') navigateTo('/admin/analytics');
-            if (viewId === 'users') navigateTo('/admin/settings');
-            if (viewId === 'settings') navigateTo('/admin/settings');
-            if (viewId === 'ai') navigateTo('/admin/ai');
-          }}
+    <div className="min-h-screen bg-[#f6f6f6] flex flex-col lg:flex-row text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
+      <FigmaSidebar
+        currentView={currentAdminNav}
+        mobileOpen={sidebarOpen}
+        onCloseMobile={() => setSidebarOpen(false)}
+        onSelectView={(viewId) => {
+          setSidebarOpen(false);
+          if (viewId === 'command-center') navigateTo('/admin');
+          if (viewId === 'bins-locations') navigateTo('/admin/bins');
+          if (viewId === 'device-detail') navigateTo(activeBin ? `/admin/bins/${activeBin.code}` : '/admin/bins');
+          if (viewId === 'alerts') navigateTo('/admin/alerts');
+          if (viewId === 'complaints') navigateTo('/admin/complaints');
+          if (viewId === 'routes') navigateTo('/admin/routes');
+          if (viewId === 'analytics') navigateTo('/admin/analytics');
+          if (viewId === 'users') navigateTo('/admin/settings');
+          if (viewId === 'settings') navigateTo('/admin/settings');
+          if (viewId === 'ai') navigateTo('/admin/ai');
+        }}
+      />
+      <div className="flex-1 flex flex-col min-w-0 w-full">
+        <FigmaTopbar
+          onLogout={handleLogout}
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
         />
-        <FigmaTopbar onLogout={handleLogout} />
-        <main className="figma-admin-content">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {currentRoute === '/admin' && <OperationsCommandCenter onSelectBin={(bin) => openBin(bin, '/admin/bins')} />}
           {currentRoute === '/admin/bins' && <BinsAndLocationsView onSelectBin={(bin) => openBin(bin, '/admin/bins')} />}
           {currentRoute.startsWith('/admin/bins/') && <BinDetailView bin={activeBin} onBack={() => navigateTo('/admin')} />}

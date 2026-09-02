@@ -6,98 +6,136 @@ import {
   FileText,
   LayoutDashboard,
   ListChecks,
-  MapPin,
   Route,
   Settings,
   Trash2,
   Users,
+  X,
+  Sparkles,
 } from 'lucide-react';
 
 interface FigmaSidebarProps {
   currentView: string;
   onSelectView: (view: string) => void;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 const navItems = [
-  { id: 'command-center', label: 'Overview', icon: LayoutDashboard, top: 167 },
-  { id: 'bins-locations', label: 'Bins', icon: Trash2, top: 234 },
-  { id: 'device-detail', label: 'Device detail', icon: ListChecks, top: 280 },
-  { id: 'alerts', label: 'Alerts', icon: Bell, top: 326 },
-  { id: 'complaints', label: 'Complaints', icon: FileText, top: 372 },
-  { id: 'routes', label: 'Routes', icon: Route, top: 418 },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, top: 464 },
-  { id: 'users', label: 'Users', icon: Users, top: 505 },
-  { id: 'settings', label: 'Settings', icon: Settings, top: 553 },
+  { id: 'command-center', label: 'Overview', icon: LayoutDashboard },
+  { id: 'bins-locations', label: 'Bins', icon: Trash2 },
+  { id: 'device-detail', label: 'Device detail', icon: ListChecks },
+  { id: 'alerts', label: 'Alerts', icon: Bell },
+  { id: 'complaints', label: 'Complaints', icon: FileText },
+  { id: 'routes', label: 'Routes', icon: Route },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'users', label: 'Users', icon: Users },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-export const FigmaSidebar: React.FC<FigmaSidebarProps> = ({ currentView, onSelectView }) => {
-  return (
-    <aside className="absolute left-0 top-0 h-[1057px] w-[189px] overflow-hidden bg-white" data-name="side bar">
-      <div className="absolute left-[11px] top-[89px] h-px w-[166px] bg-black/10" />
-      <button
-        type="button"
-        onClick={() => onSelectView('command-center')}
-        className="absolute left-[29px] top-[35px] h-[32px] w-[130px] text-left"
-        aria-label="KlinGhana overview"
-      >
-        <span className="absolute left-0 top-0 whitespace-pre text-[24px] font-extrabold leading-none text-[#1174e6] font-['Inter',sans-serif]">
-          KlinGh    na
-        </span>
-        <span className="absolute left-[78px] top-[3px] flex h-[24px] w-[24px] items-center justify-center rounded bg-[#1174e6] text-[12px] font-black text-white">
-          K
-        </span>
-      </button>
+export const FigmaSidebar: React.FC<FigmaSidebarProps> = ({
+  currentView,
+  onSelectView,
+  mobileOpen = false,
+  onCloseMobile,
+}) => {
+  const handleItemClick = (id: string) => {
+    onSelectView(id);
+    onCloseMobile?.();
+  };
 
-      {navItems.map((item) => {
-        const Icon = item.icon;
-        const active = currentView === item.id || (item.id === 'users' && currentView === 'settings');
-        if (item.id === 'command-center') {
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSelectView(item.id)}
-              className="figma-button-hit absolute left-[15px] top-[167px] h-[36px] w-[162px] rounded-[20px] border border-[#3b82f6] bg-white text-[#3b82f6]"
-            >
-              <Icon className="absolute left-[9px] top-[5px] h-[24px] w-[24px]" strokeWidth={1.7} />
-              <span className="absolute left-[38px] top-[7px] whitespace-nowrap text-[16px] font-medium leading-normal font-['Inter',sans-serif]">
-                Overview
-              </span>
-            </button>
-          );
-        }
-
-        return (
+  const content = (
+    <div className="flex h-full flex-col justify-between p-4 font-['Plus_Jakarta_Sans',sans-serif]">
+      <div>
+        {/* Logo & Close (Mobile) */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <button
-            key={item.id}
-            onClick={() => onSelectView(item.id)}
-            className={`figma-button-hit absolute left-0 h-[36px] w-[189px] text-left ${active ? 'text-[#3b82f6]' : 'text-[#8daac0]'}`}
-            style={{ top: item.top }}
+            type="button"
+            onClick={() => handleItemClick('command-center')}
+            className="flex items-center gap-1.5 text-left group"
+            aria-label="KlinGhana overview"
           >
-            <Icon className="absolute left-[26px] top-[5px] h-[20px] w-[20px] text-black" strokeWidth={1.8} />
-            <span className="absolute left-[68px] top-[5px] w-[112px] text-[12px] font-medium leading-[1.18]">
-              {item.label}
+            <span className="text-xl font-extrabold tracking-tight text-[#1174e6] font-['Outfit',sans-serif]">
+              KlinGh<span className="inline-flex items-center justify-center w-5 h-5 mx-0.5 rounded bg-[#1174e6] text-white text-[11px] font-black">K</span>na
             </span>
           </button>
-        );
-      })}
+          {onCloseMobile && (
+            <button
+              type="button"
+              onClick={onCloseMobile}
+              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
 
-      <div className="absolute left-[4px] top-[806px] h-[169px] w-[178px] overflow-hidden rounded-[15px] bg-[#dbeafe]">
-        <p className="absolute left-[10px] top-[18px] h-[34px] w-[150px] text-[10px] font-semibold leading-[26px] text-[#0b1f1a]">
-          Need help identifying the issue?
-        </p>
-        <p className="absolute left-[12px] top-[49px] h-[75px] w-[159px] text-[8px] font-normal leading-[19px] text-[#0b1f1a]">
-          Ask the KlinGhana assistant about sorting, bin status or what to include in your report. It cannot operate the lid.
+        {/* Navigation List */}
+        <nav className="mt-4 space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = currentView === item.id || (item.id === 'users' && currentView === 'settings');
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleItemClick(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  active
+                    ? 'bg-blue-50 text-blue-600 shadow-xs font-bold'
+                    : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                }`}
+              >
+                <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-blue-600' : 'text-slate-500'}`} strokeWidth={1.9} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* AI Assistant Help Banner */}
+      <div className="mt-4 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-3.5 shadow-xs">
+        <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>AI Support</span>
+        </div>
+        <p className="mt-1 text-[11px] text-slate-600 leading-snug">
+          Ask the KlinGhana AI assistant about bin diagnostics, sorting guidelines, or telemetry.
         </p>
         <button
           type="button"
-          onClick={() => onSelectView('ai')}
-          className="figma-button-hit absolute left-[25px] top-[114px] h-[45px] w-[135px] rounded-[10px] bg-black text-white"
+          onClick={() => handleItemClick('ai')}
+          className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-colors"
         >
-          <span className="absolute left-[41px] top-[13px] text-[16px] font-semibold leading-[17px]">Ask</span>
-          <Bot className="absolute left-[77px] top-[8px] h-[15px] w-[15px]" />
-          <MapPin className="absolute left-[75px] top-[17px] h-[19px] w-[19px]" />
+          <Bot className="w-3.5 h-3.5" />
+          <span>Ask Assistant</span>
         </button>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sticky Sidebar */}
+      <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-slate-200/80 bg-white min-h-screen sticky top-0 h-screen z-20">
+        {content}
+      </aside>
+
+      {/* Mobile Slide-Out Drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+            onClick={onCloseMobile}
+          />
+          {/* Drawer */}
+          <div className="fixed inset-y-0 left-0 w-64 max-w-[85vw] bg-white shadow-2xl transition-transform animate-in slide-in-from-left duration-200 z-50">
+            {content}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
