@@ -9,7 +9,7 @@ interface FirmwareExporterProps {
 export const FirmwareExporter: React.FC<FirmwareExporterProps> = ({ selectedBin }) => {
   const [copied, setCopied] = useState(false);
   const [wifiSsid, setWifiSsid] = useState('KLENGHANA');
-  const [serverHost, setServerHost] = useState('https://ufnwwgilqxvjrzrmydes.supabase.co/functions/v1/iot-telemetry');
+  const [baseUrl, setBaseUrl] = useState('https://temporary-racing-mandolin-nq6whz1.vercel.app');
 
   const binCode = selectedBin?.code || 'SB-024';
 
@@ -20,7 +20,7 @@ export const FirmwareExporter: React.FC<FirmwareExporterProps> = ({ selectedBin 
  *  - HC-SR04 Ultrasonic Sensor: TRIG=GPIO 5, ECHO=GPIO 18 (via 1k/2k voltage divider)
  *  - NEO-6M GPS Module: RX=GPIO 16, TX=GPIO 17 (HardwareSerial 2 @ 9600 baud)
  *  - Status LED: GPIO 2
- *  - Transport: HTTPS POST to Supabase Edge Function
+ *  - Transport: HTTPS POST to KlinGhana Hosted Endpoint: \${WEB_APP_BASE_URL}/api/iot/telemetry
  */
 
 #include <Arduino.h>
@@ -35,9 +35,8 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
 // Device & Cloud Configuration
 const char* DEVICE_ID = "${binCode}";
-const char* DEVICE_KEY = "YOUR_DEVICE_KEY";
-const char* SUPABASE_PUBLISHABLE_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
-const char* TELEMETRY_URL = "${serverHost}";
+const char* DEVICE_KEY = "klinghana_dev_device_key_sb024";
+const char* WEB_APP_BASE_URL = "${baseUrl}";
 
 // Calibration Constants
 const float EMPTY_DISTANCE_CM = 100.0f;
@@ -120,14 +119,14 @@ void loop() {
 
     if (WiFi.status() == WL_CONNECTED) {
       HTTPClient http;
-      http.begin(TELEMETRY_URL);
+      String endpoint = String(WEB_APP_BASE_URL) + "/api/iot/telemetry";
+      http.begin(endpoint);
       http.addHeader("Content-Type", "application/json");
-      http.addHeader("apikey", SUPABASE_PUBLISHABLE_KEY);
       http.addHeader("X-Device-Id", DEVICE_ID);
       http.addHeader("X-Device-Key", DEVICE_KEY);
 
       int code = http.POST(payload);
-      Serial.printf("[HTTP] POST status: %d\\n", code);
+      Serial.printf("[HTTP] POST status: %d\n", code);
       http.end();
     }
   }
