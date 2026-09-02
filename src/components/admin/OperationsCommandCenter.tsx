@@ -1,7 +1,18 @@
 import React from 'react';
 import { RefreshCw } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { SmartBin } from '../../types';
 import { useSmartBin } from '../../context/SmartBinContext';
+
+const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
+  const map = useMap();
+  React.useEffect(() => {
+    if (center && Number.isFinite(center[0]) && Number.isFinite(center[1]) && center[0] !== 0 && center[1] !== 0) {
+      map.setView(center, map.getZoom(), { animate: true });
+    }
+  }, [center, map]);
+  return null;
+};
 
 interface OperationsCommandCenterProps {
   onSelectBin: (bin: SmartBin) => void;
@@ -36,6 +47,8 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
 
   const targetBin = selectedBin;
   const mapBins = bins.slice(0, 4);
+  const gpsBins = mapBins.filter((b) => Number.isFinite(b.location.lat) && Number.isFinite(b.location.lng) && b.location.lat !== 0 && b.location.lng !== 0);
+  const mapCenter: [number, number] = gpsBins[0] ? [gpsBins[0].location.lat, gpsBins[0].location.lng] : [6.6885, -1.6244];
   const shownReports = citizenReports.filter((report) => report.status !== 'Resolved' && report.status !== 'Closed').slice(0, 3);
   const shownAlerts = alerts.filter((alert) => !alert.read).slice(0, 3);
   const collectedStops = routeStops.filter((stop) => stop.status === 'COLLECTED').length;
@@ -98,43 +111,38 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
         </button>
       ))}
 
-      <div className="absolute left-[37px] top-[306px] h-[390px] w-[729px] overflow-hidden bg-white">
-        <h2 className="absolute left-[33px] top-[23px] w-[320px] text-[18px] font-bold leading-[1.18] text-[#3b82f6]">Kumasi SmartBin Mesh</h2>
-        <p className="absolute left-[33px] top-[49px] w-[360px] text-[11px] font-medium leading-[1.18] text-[#8daac0]">
-          Live asset positions and sensor event overlay
-        </p>
-        <button type="button" className="figma-button-hit absolute left-[551px] top-[23px] h-[26px] w-[150px] rounded-[13px] border border-[#8ca19a] bg-[#047857]">
-          <span className="absolute left-[14px] top-[10px] h-[8px] w-[8px] rounded-full bg-white" />
-          <span className="absolute left-[28px] top-[7px] text-[10px] font-bold leading-[1.18] text-white">Map layer: Dustbins</span>
-        </button>
-        <img alt="Accra East street map" src="/figma-assets/operations-map.jpeg" className="absolute left-[48px] top-[89px] h-[272px] w-[631px] object-cover opacity-70" />
-
-        {mapBins.length === 0 && (
-          <div className="absolute left-[118px] top-[184px] w-[492px] rounded-[15px] border border-dashed border-[#8daac0] bg-white/95 p-5 text-center text-[12px] text-[#587187]">
-            <div className="text-[16px] font-bold text-[#0b1f1a]">No live bins registered</div>
-            <p className="mt-1">Supabase returned zero bins.</p>
+      <div className="absolute left-[37px] top-[306px] h-[390px] w-[729px] overflow-hidden rounded-[15px] border border-slate-200/80 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div>
+            <h2 className="text-[17px] font-bold text-slate-900 font-['Outfit',sans-serif]">Kumasi SmartBin Fleet Mesh</h2>
+            <p className="text-[11px] text-slate-500">Live GPS tracking & sensor telemetry overlay</p>
           </div>
-        )}
+          <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[11px] font-bold text-emerald-700">
+            {bins.length} Active Bins
+          </span>
+        </div>
 
-        {mapBins.map((bin, index) => {
-          const positions = [
-            { x: 260, y: 150 },
-            { x: 91, y: 133 },
-            { x: 317, y: 225 },
-            { x: 86, y: 274 },
-            { x: 450, y: 118 },
-          ][index] || { x: 260, y: 150 };
-          const pinColor = bin.currentFillLevel >= 95 ? '#ff4d74' : bin.currentFillLevel >= 80 ? '#ffb23e' : '#10b981';
-          return (
-            <button key={bin.id} type="button" onClick={() => selectBin(bin)} className="figma-button-hit absolute h-[78px] w-[180px] text-left" style={{ left: positions.x, top: positions.y }}>
-              <span className="absolute left-0 top-0 h-[78px] w-[77px] rounded-full opacity-25" style={{ background: pinColor }} />
-              <span className="absolute left-[9px] top-[11px] flex h-[53px] w-[53px] items-center justify-center rounded-[12px] text-[24px] font-black text-white shadow-lg" style={{ background: pinColor }}>K</span>
-              <span className="absolute left-[46px] top-[22px] h-[36px] w-[130px] rounded-[10px] bg-slate-900/80 px-2 py-1 shadow" />
-              <span className="absolute left-[54px] top-[25px] text-[11px] font-bold leading-[1.18] text-white">{bin.code}</span>
-              <span className="absolute left-[54px] top-[39px] text-[10px] font-semibold leading-[1.18] text-emerald-400">{formatPercent(bin.currentFillLevel)} ({bin.gpsFix ? 'GPS lock' : 'Kumasi Hostel'})</span>
-            </button>
-          );
-        })}
+        <div className="relative mt-2 h-[305px] w-full overflow-hidden rounded-xl border border-slate-200 shadow-inner">
+          <MapContainer center={mapCenter} zoom={13} scrollWheelZoom={false} className="h-full w-full">
+            <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            {gpsBins[0] && <MapRecenter center={[gpsBins[0].location.lat, gpsBins[0].location.lng]} />}
+            {gpsBins.map((bin) => (
+              <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]} eventHandlers={{ click: () => selectBin(bin) }}>
+                <Popup>
+                  <div className="p-1 text-xs">
+                    <strong>{bin.code} - {bin.name}</strong>
+                    <div className="mt-1 font-bold text-emerald-600">Fill: {bin.currentFillLevel}%</div>
+                    <div>Location: {bin.location.address || bin.location.city}</div>
+                    <div className="text-[10px] text-slate-500 mt-1">{bin.gpsFix ? 'Confirmed Satellite Lock' : 'Bench Location'}</div>
+                    <button onClick={() => selectBin(bin)} className="mt-2 w-full rounded bg-blue-600 py-1 text-[10px] font-bold text-white">
+                      Inspect Telemetry
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
+        </div>
       </div>
 
       <div className="absolute left-[810px] top-[302px] h-[214px] w-[345px] overflow-hidden rounded-[15px] bg-white text-left">
