@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { isSupabaseConfigured, supabase } from '../../services/supabaseClient';
 import { env } from '../../config/env';
 import { ShieldCheck, Lock, Mail, Building2, ArrowRight } from 'lucide-react';
+import { Logo } from '../common/Logo';
 
 interface LoginViewProps {
   onLogin: (role: 'admin' | 'citizen') => void;
@@ -25,8 +26,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
           throw new Error('Supabase authentication is required in LIVE mode. Real credentials must be configured.');
         }
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
+
+        const userId = signInData.user?.id;
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+
+        // Fail closed: any lookup error, missing profile row, or the default
+        // 'USER' role means no admin-portal access — only an explicitly
+        // promoted profiles.role (e.g. 'ADMIN') is granted entry here.
+        if (profileError || !profile || profile.role === 'USER') {
+          await supabase.auth.signOut();
+          throw new Error('This account does not have admin access. Ask an existing admin to promote your profile, or use the Citizen Portal below.');
+        }
       }
       onLogin('admin');
     } catch (err) {
@@ -71,7 +87,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
           {/* Bottom Info */}
           <div className="relative z-10 text-xs text-blue-200/80 flex items-center justify-between border-t border-white/10 pt-4">
             <span>v1.0.0 &bull; Kumasi & Accra Mesh</span>
-            <a href="#/user/report" className="text-white font-bold hover:underline">Citizen Portal &rarr;</a>
+            <a href="#/citizen" className="text-white font-bold hover:underline">Citizen Portal &rarr;</a>
           </div>
         </div>
 
@@ -80,8 +96,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
           <div className="w-full max-w-md mx-auto">
             {/* Form Header */}
             <div className="mb-8">
-              <div className="lg:hidden text-2xl font-black text-[#1174e6] mb-2 font-['Outfit',sans-serif]">
-                KlinGh<span className="inline-block px-1 rounded bg-[#1174e6] text-white text-xs">K</span>na
+              <div className="lg:hidden mb-2">
+                <Logo />
               </div>
               <h2 className="font-['Outfit',sans-serif] text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                 Admin access
@@ -168,7 +184,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
 
             <div className="mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
               Citizen looking to report waste?{' '}
-              <a href="#/user/report" className="text-blue-600 font-bold hover:underline">
+              <a href="#/citizen" className="text-blue-600 font-bold hover:underline">
                 Open Citizen Portal
               </a>
             </div>

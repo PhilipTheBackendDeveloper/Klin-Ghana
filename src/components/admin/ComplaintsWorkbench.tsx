@@ -1,7 +1,8 @@
 import React from 'react';
-import { CheckCircle2, Link as LinkIcon, MessageSquare, UserCheck } from 'lucide-react';
+import { CheckCircle2, Link as LinkIcon, MessageSquare, UserCheck, Inbox } from 'lucide-react';
 import { useSmartBin } from '../../context/SmartBinContext';
 import { CitizenReport } from '../../types';
+import { EmptyState } from '../common/EmptyState';
 
 const priorityFor = (report: CitizenReport) => {
   if (report.issueType.toLowerCase().includes('overflow')) return 'P1';
@@ -59,10 +60,7 @@ export const ComplaintsWorkbench: React.FC = () => {
           </div>
 
           {activeReports.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-              <div className="font-bold text-slate-900">No active citizen complaints</div>
-              <p className="mt-1 text-xs">The complaints table returned no unresolved reports.</p>
-            </div>
+            <EmptyState icon={CheckCircle2} title="No active citizen complaints" description="Every reported issue has been resolved." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -138,10 +136,7 @@ export const ComplaintsWorkbench: React.FC = () => {
               </div>
             </>
           ) : (
-            <div className="p-8 text-center text-sm text-slate-500">
-              <div className="font-bold text-slate-900">No complaint selected</div>
-              <p className="mt-1 text-xs">There are no unresolved complaints to inspect.</p>
-            </div>
+            <EmptyState icon={Inbox} title="No complaint selected" description="There are no unresolved complaints to inspect." />
           )}
         </div>
       </div>

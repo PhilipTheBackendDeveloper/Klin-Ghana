@@ -3,6 +3,10 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { ArrowRight, Bot, MapPin } from 'lucide-react';
 import { SmartBin } from '../../types';
 import { useSmartBin } from '../../context/SmartBinContext';
+import { MAP_TILE_URL, MAP_LABELS_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_MAX_ZOOM, MAP_LABELS_MAX_ZOOM, createBinMarkerIcon } from '../map/mapTiles';
+import { MapAutoSize } from '../map/MapAutoSize';
+import { EmptyState } from '../common/EmptyState';
+import { BinLocationLabel } from '../common/BinLocationLabel';
 
 interface UserBinsViewProps {
   onSelectBin: (bin: SmartBin) => void;
@@ -24,10 +28,12 @@ export const UserBinsView: React.FC<UserBinsViewProps> = ({ onSelectBin }) => {
       </div>
 
       <div className="relative h-[400px] overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm">
-        <MapContainer center={center} zoom={12} scrollWheelZoom={false} className="h-full w-full rounded-2xl">
-          <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <MapContainer center={center} zoom={12} maxZoom={MAP_MAX_ZOOM} scrollWheelZoom={false} className="h-full w-full rounded-2xl">
+          <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} maxZoom={MAP_MAX_ZOOM} />
+          <TileLayer url={MAP_LABELS_TILE_URL} maxZoom={MAP_LABELS_MAX_ZOOM} />
+          <MapAutoSize />
           {gpsBins.map((bin) => (
-            <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]} eventHandlers={{ click: () => onSelectBin(bin) }}>
+            <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]} icon={createBinMarkerIcon(bin)} eventHandlers={{ click: () => onSelectBin(bin) }}>
               <Popup>
                 <div className="p-1 text-xs">
                   <strong>{bin.code} - {bin.name}</strong>
@@ -50,9 +56,8 @@ export const UserBinsView: React.FC<UserBinsViewProps> = ({ onSelectBin }) => {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="grid grid-cols-1 gap-4 lg:col-span-8 sm:grid-cols-2">
           {bins.length === 0 ? (
-            <div className="col-span-full rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-              <div className="font-bold text-slate-900">No SmartBins are registered yet</div>
-              <p className="mt-1 text-xs">Live mode is showing the empty asset register from Supabase.</p>
+            <div className="col-span-full">
+              <EmptyState icon={MapPin} title="No SmartBins are registered yet" description="Check back soon — new bins are added regularly." />
             </div>
           ) : bins.map((bin) => (
             <button key={bin.id} type="button" onClick={() => onSelectBin(bin)} className="space-y-3 rounded-3xl border border-slate-200/80 bg-white p-5 text-left shadow-sm transition-all hover:shadow-md">
@@ -60,7 +65,7 @@ export const UserBinsView: React.FC<UserBinsViewProps> = ({ onSelectBin }) => {
                 <span className="rounded-lg bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-600">{bin.code}</span>
                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${bin.currentFillLevel >= 95 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{bin.currentFillLevel >= 95 ? 'Overflow' : 'Available'}</span>
               </div>
-              <div><h4 className="text-sm font-bold text-slate-900">{bin.name}</h4><p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3.5 w-3.5 shrink-0 text-blue-500" /><span>{bin.location.address}</span></p></div>
+              <div><h4 className="text-sm font-bold text-slate-900">{bin.name}</h4><p className="mt-0.5 text-xs text-slate-500"><BinLocationLabel bin={bin} /></p></div>
               <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs"><div><span className="text-slate-400">Fill: </span><strong className={bin.currentFillLevel >= 95 ? 'text-rose-600' : 'text-slate-900'}>{bin.currentFillLevel}%</strong></div><span className="flex items-center gap-0.5 text-xs font-bold text-blue-600">View Bin <ArrowRight className="h-3.5 w-3.5" /></span></div>
             </button>
           ))}

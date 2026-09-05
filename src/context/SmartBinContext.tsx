@@ -4,6 +4,7 @@ import { IotIngestionService } from '../services/iotIngestion';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { env } from '../config/env';
 import { calculateUiStatus } from '../shared/telemetryContract';
+import { DEMO_BINS, DEMO_ALERTS, DEMO_REPORTS, DEMO_COLLECTIONS, DEMO_ROUTE_STOPS } from '../data/demoSeed';
 
 export interface RouteStop {
   id?: string;
@@ -22,6 +23,13 @@ export interface SmartBinContextType {
   selectedBin: SmartBin | null;
   selectedBinId: string | null;
   setSelectedBinId: (id: string | null) => void;
+  // Distinct from selectedBinId (which auto-defaults to the first bin once
+  // live data loads, for the admin dashboard's "Selected Asset" panel).
+  // This is only ever set when a citizen explicitly enters/scans a bin code,
+  // and is what the Citizen Portal's exit control and report-form pre-fill
+  // actually key off of.
+  citizenBinId: string | null;
+  setCitizenBinId: (id: string | null) => void;
   role: UserRole;
   setRole: (role: UserRole) => void;
   alerts: AlertNotification[];
@@ -75,15 +83,11 @@ export interface SmartBinContextType {
 
 const SmartBinContext = createContext<SmartBinContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_BINS_KEY = 'klinghana_demo_smartbins_v3';
-const LOCAL_STORAGE_ALERTS_KEY = 'klinghana_demo_alerts_v3';
-const LOCAL_STORAGE_REPORTS_KEY = 'klinghana_demo_reports_v3';
-const LOCAL_STORAGE_COLLECTIONS_KEY = 'klinghana_demo_collections_v3';
-
-const DEMO_ALERTS: AlertNotification[] = [];
-const DEMO_REPORTS: CitizenReport[] = [];
-const DEMO_COLLECTIONS: CollectionRecord[] = [];
-const DEMO_ROUTE_STOPS: RouteStop[] = [];
+// v4: bumped so any previously-persisted empty demo state doesn't shadow the seeded fallback data below.
+const LOCAL_STORAGE_BINS_KEY = 'klinghana_demo_smartbins_v4';
+const LOCAL_STORAGE_ALERTS_KEY = 'klinghana_demo_alerts_v4';
+const LOCAL_STORAGE_REPORTS_KEY = 'klinghana_demo_reports_v4';
+const LOCAL_STORAGE_COLLECTIONS_KEY = 'klinghana_demo_collections_v4';
 
 const getDemoValue = <T,>(key: string, fallback: T): T => {
   try {
@@ -113,7 +117,7 @@ const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
     location: {
       lat: latitude,
       lng: longitude,
-      address: hasGpsFix ? (row.address || 'GPS verified location') : (row.address || 'Kumasi Hostel (Awaiting GPS lock)'),
+      address: hasGpsFix ? (row.address || 'GPS verified location') : (row.address || 'Awaiting GPS lock'),
       city: row.city || 'Kumasi',
       landmark: row.zone || undefined,
     },
@@ -189,7 +193,7 @@ const mapRouteRows = (rows: any[]): RouteStop[] => rows.map((row) => ({
 export const SmartBinProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const dataMode = env.VITE_DATA_MODE as DataMode;
   const demoMode = dataMode === 'demo';
-  const [bins, setBins] = useState<SmartBin[]>(() => demoMode ? getDemoValue<SmartBin[]>(LOCAL_STORAGE_BINS_KEY, []) : []);
+  const [bins, setBins] = useState<SmartBin[]>(() => demoMode ? getDemoValue<SmartBin[]>(LOCAL_STORAGE_BINS_KEY, DEMO_BINS) : []);
   const [alerts, setAlerts] = useState<AlertNotification[]>(() => demoMode ? getDemoValue(LOCAL_STORAGE_ALERTS_KEY, DEMO_ALERTS) : []);
   const [citizenReports, setCitizenReports] = useState<CitizenReport[]>(() => demoMode ? getDemoValue(LOCAL_STORAGE_REPORTS_KEY, DEMO_REPORTS) : []);
   const [collections, setCollections] = useState<CollectionRecord[]>(() => demoMode ? getDemoValue(LOCAL_STORAGE_COLLECTIONS_KEY, DEMO_COLLECTIONS) : []);
@@ -197,6 +201,7 @@ export const SmartBinProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [dataStatus, setDataStatus] = useState<DataStatus>(demoMode ? 'ready' : 'idle');
   const [dataError, setDataError] = useState<string | null>(null);
   const [selectedBinId, setSelectedBinId] = useState<string | null>(null);
+  const [citizenBinId, setCitizenBinId] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole>('admin');
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [isSimulating, setIsSimulating] = useState<boolean>(demoMode);
@@ -426,6 +431,8 @@ export const SmartBinProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       selectedBin,
       selectedBinId,
       setSelectedBinId,
+      citizenBinId,
+      setCitizenBinId,
       role,
       setRole,
       alerts,

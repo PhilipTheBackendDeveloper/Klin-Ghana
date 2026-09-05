@@ -1,8 +1,14 @@
 import React, { useEffect } from 'react';
-import { Battery, Radio, RefreshCw, Search, Layers, Flame, AlertTriangle, Truck, WifiOff, MapPin, ArrowUpRight } from 'lucide-react';
+import { Battery, Radio, RefreshCw, Search, Layers, Flame, AlertTriangle, Truck, WifiOff, ArrowUpRight, Plus, CheckCircle2 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { SmartBin } from '../../types';
 import { useSmartBin } from '../../context/SmartBinContext';
+import { isSupabaseConfigured } from '../../services/supabaseClient';
+import { MAP_TILE_URL, MAP_LABELS_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_MAX_ZOOM, MAP_LABELS_MAX_ZOOM, createBinMarkerIcon } from '../map/mapTiles';
+import { MapAutoSize } from '../map/MapAutoSize';
+import { EmptyState } from '../common/EmptyState';
+import { AddBinModal } from './AddBinModal';
+import { BinLocationLabel } from '../common/BinLocationLabel';
 
 const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
   const map = useMap();
@@ -43,6 +49,8 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
   const { bins, dataMode, dataStatus, dataError, refreshLiveData, setSelectedBinId } = useSmartBin();
   const [selectedLayer, setSelectedLayer] = React.useState('Capacity heat');
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [showAddBin, setShowAddBin] = React.useState(false);
+  const [addBinSuccess, setAddBinSuccess] = React.useState<string | null>(null);
 
   const query = searchQuery.trim().toLowerCase();
   const filtered = bins.filter((bin) => {
@@ -93,8 +101,26 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
                 </button>
               );
             })}
+            <div className="h-5 w-px bg-slate-200 mx-1" />
+            <button
+              type="button"
+              onClick={() => setShowAddBin(true)}
+              disabled={!isSupabaseConfigured()}
+              title={isSupabaseConfigured() ? undefined : 'Switch to live mode to register real bins'}
+              className="flex items-center gap-1.5 rounded-xl bg-[#1D70F5] px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Bin</span>
+            </button>
           </div>
         </div>
+
+        {addBinSuccess && (
+          <div className="mt-3 flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+            <span>{addBinSuccess}</span>
+          </div>
+        )}
 
         {dataMode === 'live' && dataStatus !== 'ready' && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
@@ -117,11 +143,13 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
           </div>
 
           <div className="relative mt-2 h-[490px] overflow-hidden rounded-2xl">
-            <MapContainer center={center} zoom={13} scrollWheelZoom className="h-full w-full">
-              <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <MapContainer center={center} zoom={13} maxZoom={MAP_MAX_ZOOM} scrollWheelZoom className="h-full w-full">
+              <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} maxZoom={MAP_MAX_ZOOM} />
+              <TileLayer url={MAP_LABELS_TILE_URL} maxZoom={MAP_LABELS_MAX_ZOOM} />
+              <MapAutoSize />
               {gpsBins[0] && <MapRecenter center={[gpsBins[0].location.lat, gpsBins[0].location.lng]} />}
               {gpsBins.map((bin) => (
-                <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]} eventHandlers={{ click: () => selectBin(bin) }}>
+                <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]} icon={createBinMarkerIcon(bin)} eventHandlers={{ click: () => selectBin(bin) }}>
                   <Popup>
                     <div className="p-1 text-xs">
                       <strong>{bin.code} - {bin.name}</strong>
@@ -149,10 +177,12 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
           <div className="px-1 text-xs font-bold uppercase tracking-wider text-slate-400">Asset Register - Priority Queue</div>
 
           {filtered.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-              <div className="font-bold text-slate-900">No bins found</div>
-              <p className="mt-1 text-xs">Live mode is showing exactly what Supabase returned for the current filters.</p>
-            </div>
+            <EmptyState
+              icon={Search}
+              title="No bins match your search"
+              description="Try a different bin code, street name, or zone."
+              action={searchQuery ? { label: 'Clear search', onClick: () => setSearchQuery('') } : undefined}
+            />
           ) : filtered.map((bin) => (
             <button
               key={bin.id}
@@ -167,9 +197,8 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
                     <span className="text-[10px] font-bold uppercase text-slate-400">{bin.category}</span>
                   </div>
                   <h4 className="mt-1 text-sm font-bold text-slate-900">{bin.name}</h4>
-                  <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
-                    <MapPin className="h-3 w-3 text-blue-500" />
-                    <span>{bin.location.address}</span>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    <BinLocationLabel bin={bin} />
                   </p>
                 </div>
                 <div className="text-right">
@@ -187,6 +216,18 @@ export const BinsAndLocationsView: React.FC<BinsAndLocationsViewProps> = ({ onSe
           ))}
         </div>
       </div>
+
+      {showAddBin && (
+        <AddBinModal
+          onClose={() => setShowAddBin(false)}
+          onCreated={async () => {
+            setShowAddBin(false);
+            await refreshLiveData();
+            setAddBinSuccess('Bin registered — it now appears in the asset register below.');
+            setTimeout(() => setAddBinSuccess(null), 5000);
+          }}
+        />
+      )}
     </div>
   );
 };

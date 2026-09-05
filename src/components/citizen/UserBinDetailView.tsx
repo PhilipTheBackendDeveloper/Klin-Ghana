@@ -1,7 +1,8 @@
 import React from 'react';
-import { ArrowLeft, Battery, MapPin, Radio, Thermometer } from 'lucide-react';
+import { ArrowLeft, Battery, Radio, Thermometer } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid } from 'recharts';
 import { SmartBin } from '../../types';
+import { BinLocationLabel } from '../common/BinLocationLabel';
 
 interface UserBinDetailViewProps {
   bin: SmartBin;
@@ -12,7 +13,9 @@ interface UserBinDetailViewProps {
 const valueOrNA = (value: number | null | undefined, suffix = '') => value == null ? 'N/A' : `${value}${suffix}`;
 
 export const UserBinDetailView: React.FC<UserBinDetailViewProps> = ({ bin, onBack, onReportProblem }) => {
-  const telemetryHistory = [{ hour: 'Current', fill: bin.currentFillLevel }];
+  // "fillLevel" (not "fill") — Recharts spreads data fields onto the SVG <rect>,
+  // so a field named "fill" would clobber the bar's own fill color attribute.
+  const telemetryHistory = [{ hour: 'Current', fillLevel: bin.currentFillLevel }];
 
   return (
     <div className="space-y-6 font-['Plus_Jakarta_Sans',sans-serif]">
@@ -26,7 +29,7 @@ export const UserBinDetailView: React.FC<UserBinDetailViewProps> = ({ bin, onBac
               <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-black uppercase text-slate-700">{bin.status}</span>
             </div>
             <h2 className="font-['Outfit',sans-serif] mt-3 text-2xl font-black text-slate-900">{bin.name}</h2>
-            <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3.5 w-3.5 text-blue-500" /><span>{bin.location.address} - {bin.location.city}</span></p>
+            <p className="mt-0.5 text-xs text-slate-500"><BinLocationLabel bin={bin} /> <span>- {bin.location.city}</span></p>
           </div>
 
           <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-5">
@@ -58,7 +61,7 @@ export const UserBinDetailView: React.FC<UserBinDetailViewProps> = ({ bin, onBac
                 <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 110]} />
                 <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#FFFFFF', borderRadius: '0.75rem', fontSize: '12px' }} />
                 <ReferenceLine y={95} stroke="#F43F5E" strokeDasharray="3 3" label={{ value: '95% full threshold', position: 'top', fill: '#F43F5E', fontSize: 10 }} />
-                <Bar dataKey="fill" fill="#1D70F5" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="fillLevel" fill="#1D70F5" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

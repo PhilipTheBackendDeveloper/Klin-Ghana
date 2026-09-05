@@ -1,9 +1,12 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, Scale, AlertTriangle, Radio, ShieldCheck } from 'lucide-react';
 import { useSmartBin } from '../../context/SmartBinContext';
 import { generatePdfReport } from '../../services/pdfGenerator';
 import { exportBinsToCsv } from '../../services/csvGenerator';
+import { PageHeader } from '../common/PageHeader';
+import { StatCard } from '../common/StatCard';
+import { EmptyState } from '../common/EmptyState';
 
 export const AnalyticsAndReportsView: React.FC = () => {
   const { bins, collections, alerts, citizenReports, fleetHealth, overflowCount } = useSmartBin();
@@ -13,7 +16,10 @@ export const AnalyticsAndReportsView: React.FC = () => {
   const unresolvedWork = alerts.filter((alert) => !alert.read).length + citizenReports.filter((report) => report.status !== 'Resolved' && report.status !== 'Closed').length;
   const resolvedReports = citizenReports.filter((report) => report.status === 'Resolved' || report.status === 'Closed').length;
   const slaMet = citizenReports.length === 0 ? 0 : Math.round((resolvedReports / citizenReports.length) * 100);
-  const fillPressureData = bins.map((bin) => ({ time: bin.code, fill: bin.currentFillLevel }));
+  // Note: the data key intentionally avoids the name "fill" — Recharts spreads each
+  // data point's fields onto the underlying SVG <rect>, so a field literally named
+  // "fill" clobbers the shape's own fill color attribute with the numeric value.
+  const fillPressureData = bins.map((bin) => ({ time: bin.code, fillLevel: bin.currentFillLevel }));
   const hotspots = [...bins]
     .sort((a, b) => b.currentFillLevel - a.currentFillLevel)
     .slice(0, 5)
@@ -26,11 +32,13 @@ export const AnalyticsAndReportsView: React.FC = () => {
 
   return (
     <div className="space-y-6 font-['Plus_Jakarta_Sans',sans-serif]">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <MetricCard label="WASTE VOLUME" value={`${wasteKg.toFixed(1)}kg`} note={`${collections.length} collection records`} tone="slate" />
-        <MetricCard label="OVERFLOW RATE" value={`${overflowRate}%`} note={bins.length === 0 ? 'No bins registered' : `${overflowCount}/${bins.length} bins`} tone="rose" />
-        <MetricCard label="SENSOR UPTIME" value={`${fleetHealth.toFixed(1)}%`} note={bins.length === 0 ? 'No sensors online' : `${bins.filter((bin) => bin.wifiConnected).length}/${bins.length} online`} tone="emerald" />
-        <MetricCard label="SLA MET" value={`${slaMet}%`} note={`${unresolvedWork} unresolved items`} tone="blue" />
+      <PageHeader title="Analytics & Reports" subtitle="Fleet performance trends, hotspots, and exportable operational reports." />
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
+        <StatCard icon={Scale} label="Waste volume" value={`${wasteKg.toFixed(1)}kg`} tone="slate" note={`${collections.length} collection records`} />
+        <StatCard icon={AlertTriangle} label="Overflow rate" value={`${overflowRate}%`} tone="rose" note={bins.length === 0 ? 'No bins registered' : `${overflowCount}/${bins.length} bins`} />
+        <StatCard icon={Radio} label="Sensor uptime" value={`${fleetHealth.toFixed(1)}%`} tone="emerald" note={bins.length === 0 ? 'No sensors online' : `${bins.filter((bin) => bin.wifiConnected).length}/${bins.length} online`} />
+        <StatCard icon={ShieldCheck} label="SLA met" value={`${slaMet}%`} tone="blue" note={`${unresolvedWork} unresolved items`} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -42,9 +50,7 @@ export const AnalyticsAndReportsView: React.FC = () => {
 
           <div className="h-64 w-full">
             {fillPressureData.length === 0 ? (
-              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-300 text-center text-sm text-slate-500">
-                <div><div className="font-bold text-slate-900">No fill telemetry</div><p className="mt-1 text-xs">No bins were returned for this live environment.</p></div>
-              </div>
+              <EmptyState icon={Scale} title="No fill telemetry" description="Readings will chart here once bins report in." className="h-full" />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={fillPressureData}>
@@ -52,7 +58,7 @@ export const AnalyticsAndReportsView: React.FC = () => {
                   <XAxis dataKey="time" stroke="#94A3B8" fontSize={11} />
                   <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 110]} />
                   <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#FFFFFF', borderRadius: '0.75rem', fontSize: '12px' }} />
-                  <Bar dataKey="fill" name="Current Fill %" fill="#1D70F5" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="fillLevel" name="Current Fill %" fill="#1D70F5" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -67,10 +73,7 @@ export const AnalyticsAndReportsView: React.FC = () => {
 
           <div className="space-y-3">
             {hotspots.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                <div className="font-bold text-slate-900">No hotspot data</div>
-                <p className="mt-1 text-xs">No bins or alerts were returned.</p>
-              </div>
+              <EmptyState icon={AlertTriangle} title="No hotspot data" description="Rankings appear once bins and alerts are active." />
             ) : hotspots.map((hotspot) => (
               <div key={hotspot.location} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-3.5 text-xs">
                 <div><div className="font-bold text-slate-900">{hotspot.location}</div><div className="text-[11px] text-slate-500">{hotspot.overflowCount} active alerts</div></div>
@@ -93,17 +96,6 @@ export const AnalyticsAndReportsView: React.FC = () => {
           Reports are generated on demand from the current live arrays: {bins.length} bins, {collections.length} collections, {alerts.length} alerts.
         </div>
       </div>
-    </div>
-  );
-};
-
-const MetricCard: React.FC<{ label: string; value: string; note: string; tone: 'slate' | 'rose' | 'emerald' | 'blue' }> = ({ label, value, note, tone }) => {
-  const toneClass = tone === 'rose' ? 'text-rose-600' : tone === 'emerald' ? 'text-emerald-600' : tone === 'blue' ? 'text-blue-600' : 'text-slate-900';
-  return (
-    <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
-      <span className="text-xs font-semibold text-slate-500">{label}</span>
-      <div className={`font-['Outfit',sans-serif] mt-1.5 text-3xl font-black ${toneClass}`}>{value}</div>
-      <span className="text-[11px] font-bold text-slate-400">{note}</span>
     </div>
   );
 };

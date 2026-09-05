@@ -1,27 +1,39 @@
 import React, { useState, useMemo } from 'react';
-import { Bell, LogOut, Menu, Moon, Search, Sun, Trash2, AlertTriangle, FileText, X } from 'lucide-react';
+import { Bell, LogOut, Menu, Search, Trash2, AlertTriangle, FileText, X } from 'lucide-react';
 import { useSmartBin } from '../../context/SmartBinContext';
+import { Logo } from '../common/Logo';
+
+interface TopbarUser {
+  fullName: string;
+  email: string;
+}
 
 interface FigmaTopbarProps {
   onLogout: () => void;
   onSearch?: (query: string) => void;
   onToggleSidebar?: () => void;
+  user?: TopbarUser | null;
 }
 
-export const FigmaTopbar: React.FC<FigmaTopbarProps> = ({ onLogout, onSearch, onToggleSidebar }) => {
+const initialsFor = (fullName: string) =>
+  fullName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('') || '?';
+
+export const FigmaTopbar: React.FC<FigmaTopbarProps> = ({ onLogout, onSearch, onToggleSidebar, user }) => {
   const { alerts, bins, citizenReports, setSelectedBinId } = useSmartBin();
   const [query, setQuery] = useState('');
+  const displayName = user?.fullName || 'Demo Admin';
+  const displayEmail = user?.email || 'Demo mode — no account signed in';
+  const initials = initialsFor(displayName);
   const [searchFocused, setSearchFocused] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const unreadAlerts = alerts.filter((alert) => !alert.read).length;
-
-  const applyTheme = (next: 'light' | 'dark') => {
-    setTheme(next);
-    document.documentElement.classList.toggle('dark', next === 'dark');
-  };
 
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -63,8 +75,8 @@ export const FigmaTopbar: React.FC<FigmaTopbarProps> = ({ onLogout, onSearch, on
           )}
 
           {/* Mobile KlinGhana Brand */}
-          <span className="lg:hidden font-bold text-sm tracking-tight text-[#1174e6]">
-            KlinGh<span className="inline-block px-1 py-0.5 rounded bg-[#1174e6] text-white text-[10px]">K</span>na
+          <span className="lg:hidden shrink-0">
+            <Logo size="sm" />
           </span>
 
           {/* Search Input */}
@@ -164,28 +176,8 @@ export const FigmaTopbar: React.FC<FigmaTopbarProps> = ({ onLogout, onSearch, on
           </div>
         </div>
 
-        {/* Right: Theme Toggle, Notifications, Profile, Logout */}
+        {/* Right: Notifications, Profile, Logout */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Theme Toggle */}
-          <div className="hidden sm:flex items-center rounded-full bg-slate-100 p-1 border border-slate-200/60">
-            <button
-              type="button"
-              aria-label="Light mode"
-              onClick={() => applyTheme('light')}
-              className={`p-1.5 rounded-full transition-all ${theme === 'light' ? 'bg-white shadow-xs text-amber-500' : 'text-slate-400 hover:text-slate-700'}`}
-            >
-              <Sun className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              aria-label="Dark mode"
-              onClick={() => applyTheme('dark')}
-              className={`p-1.5 rounded-full transition-all ${theme === 'dark' ? 'bg-white shadow-xs text-blue-500' : 'text-slate-400 hover:text-slate-700'}`}
-            >
-              <Moon className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
           {/* Notifications Bell */}
           <div className="relative">
             <button
@@ -236,19 +228,19 @@ export const FigmaTopbar: React.FC<FigmaTopbarProps> = ({ onLogout, onSearch, on
               className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-100 transition-colors text-left"
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xs shadow-xs">
-                AM
+                {initials}
               </div>
               <div className="hidden md:block">
-                <div className="text-xs font-bold text-slate-900 leading-tight">Ama Mensah</div>
-                <div className="text-[10px] text-slate-500">Admin &bull; Kumasi / Accra</div>
+                <div className="text-xs font-bold text-slate-900 leading-tight">{displayName}</div>
+                <div className="text-[10px] text-slate-500 truncate max-w-[160px]">{displayEmail}</div>
               </div>
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl z-50 text-xs">
+              <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl z-50 text-xs">
                 <div className="px-3 py-2 border-b border-slate-100">
-                  <div className="font-bold text-slate-900">Ama Mensah</div>
-                  <div className="text-[10px] text-slate-500">Fleet Dispatcher</div>
+                  <div className="font-bold text-slate-900">{displayName}</div>
+                  <div className="text-[10px] text-slate-500 truncate">{displayEmail}</div>
                 </div>
                 <a href="#/admin/settings" className="block px-3 py-2 rounded-lg hover:bg-slate-50 text-slate-700">Account Settings</a>
                 <a href="#/user/report" className="block px-3 py-2 rounded-lg hover:bg-slate-50 text-slate-700">Citizen View</a>

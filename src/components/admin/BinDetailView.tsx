@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Battery, Cpu, MapPin, Radio, Thermometer, UserCheck, Truck, FileText, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Battery, Cpu, Radio, Thermometer, UserCheck, Truck, FileText, CheckCircle2, QrCode } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
 import { SmartBin } from '../../types';
 import { isSupabaseConfigured, supabase } from '../../services/supabaseClient';
+import { BinQrModal } from './BinQrModal';
+import { BinLocationLabel } from '../common/BinLocationLabel';
 
 interface BinDetailViewProps {
   bin: SmartBin | null;
@@ -28,8 +30,11 @@ export const BinDetailView: React.FC<BinDetailViewProps> = ({ bin, onBack }) => 
   const [diagnosticResult, setDiagnosticResult] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [events, setEvents] = useState<Array<{ timestamp: string; text: string }>>([]);
+  const [showQrCode, setShowQrCode] = useState(false);
 
-  const telemetryHistory = bin ? [{ hour: 'Current', fill: bin.currentFillLevel }] : [];
+  // "fillLevel" (not "fill") — Recharts spreads data fields onto the SVG <rect>,
+  // so a field named "fill" would clobber the bar's own fill color attribute.
+  const telemetryHistory = bin ? [{ hour: 'Current', fillLevel: bin.currentFillLevel }] : [];
 
   const handleRunDiagnostic = async () => {
     if (!bin) return;
@@ -133,9 +138,8 @@ export const BinDetailView: React.FC<BinDetailViewProps> = ({ bin, onBack }) => 
               <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-black uppercase text-slate-700">{statusText(bin)}</span>
             </div>
             <h2 className="font-['Outfit',sans-serif] mt-3 text-2xl font-black text-slate-900">{bin.name}</h2>
-            <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-              <MapPin className="h-3.5 w-3.5 text-blue-500" />
-              <span>{bin.location.address} - {bin.location.city}</span>
+            <p className="mt-0.5 text-xs text-slate-500">
+              <BinLocationLabel bin={bin} /> <span>- {bin.location.city}</span>
             </p>
           </div>
 
@@ -178,7 +182,7 @@ export const BinDetailView: React.FC<BinDetailViewProps> = ({ bin, onBack }) => 
                 <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 110]} />
                 <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#FFFFFF', borderRadius: '0.75rem', fontSize: '12px' }} />
                 <ReferenceLine y={95} stroke="#F43F5E" strokeDasharray="3 3" label={{ value: '95% full threshold', position: 'top', fill: '#F43F5E', fontSize: 10 }} />
-                <Bar dataKey="fill" fill="#1D70F5" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="fillLevel" fill="#1D70F5" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -259,9 +263,21 @@ export const BinDetailView: React.FC<BinDetailViewProps> = ({ bin, onBack }) => 
               </div>
               <span>→</span>
             </button>
+            <button
+              onClick={() => setShowQrCode(true)}
+              className="flex w-full items-center justify-between rounded-2xl bg-slate-50 p-3.5 text-xs font-bold text-slate-700 transition-all hover:bg-slate-100"
+            >
+              <div className="flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-blue-600" />
+                <span>Get citizen QR code</span>
+              </div>
+              <span>→</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {showQrCode && <BinQrModal bin={bin} onClose={() => setShowQrCode(false)} />}
     </div>
   );
 };

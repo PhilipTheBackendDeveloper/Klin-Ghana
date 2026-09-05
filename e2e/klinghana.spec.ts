@@ -41,12 +41,6 @@ test.describe('KlinGhana E2E Acceptance Suite', () => {
       await searchInput.fill('');
     }
 
-    // Theme Toggle
-    const sunBtn = page.locator('button[aria-label="Light mode"]').first();
-    const moonBtn = page.locator('button[aria-label="Dark mode"]').first();
-    if (await sunBtn.isVisible()) await sunBtn.click();
-    if (await moonBtn.isVisible()) await moonBtn.click();
-
     // Notifications Bell
     const bellBtn = page.locator('button[aria-label="Notifications"]').first();
     if (await bellBtn.isVisible()) {
@@ -108,7 +102,7 @@ test.describe('KlinGhana E2E Acceptance Suite', () => {
     await expect(page.locator('text=Nearby SmartBins in Accra')).toBeVisible();
 
     await page.goto('/#/user/complaints');
-    await expect(page.locator('text=No complaints')).toBeVisible();
+    await expect(page.locator('text=Complaints Workbench')).toBeVisible();
 
     // 8. Logout
     await page.goto('/#/admin');

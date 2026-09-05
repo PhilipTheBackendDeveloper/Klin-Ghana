@@ -2,6 +2,9 @@ import React from 'react';
 import { CheckCircle2, Truck } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import { useSmartBin } from '../../context/SmartBinContext';
+import { MAP_TILE_URL, MAP_LABELS_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_MAX_ZOOM, MAP_LABELS_MAX_ZOOM, createBinMarkerIcon } from '../map/mapTiles';
+import { MapAutoSize } from '../map/MapAutoSize';
+import { EmptyState } from '../common/EmptyState';
 
 export const CollectionsAndRoutesView: React.FC = () => {
   const { routeStops, bins, routeLoad, markRouteStopCollected } = useSmartBin();
@@ -45,11 +48,13 @@ export const CollectionsAndRoutesView: React.FC = () => {
           </div>
 
           <div className="relative mt-2 h-[430px] overflow-hidden rounded-2xl">
-            <MapContainer center={center} zoom={12} scrollWheelZoom={false} className="h-full w-full">
-              <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <MapContainer center={center} zoom={12} maxZoom={MAP_MAX_ZOOM} scrollWheelZoom={false} className="h-full w-full">
+              <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} maxZoom={MAP_MAX_ZOOM} />
+              <TileLayer url={MAP_LABELS_TILE_URL} maxZoom={MAP_LABELS_MAX_ZOOM} />
+              <MapAutoSize />
               {polylineCoords.length > 1 && <Polyline positions={polylineCoords} pathOptions={{ color: '#1D70F5', weight: 4, dashArray: '6, 6' }} />}
               {stopBins.map((bin) => (
-                <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]}>
+                <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]} icon={createBinMarkerIcon(bin)}>
                   <Popup><strong>{bin.code} - {bin.name}</strong></Popup>
                 </Marker>
               ))}
@@ -71,10 +76,7 @@ export const CollectionsAndRoutesView: React.FC = () => {
             </div>
 
             {routeStops.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                <div className="font-bold text-slate-900">No active route stops</div>
-                <p className="mt-1 text-xs">The route manifest table returned no stops.</p>
-              </div>
+              <EmptyState icon={Truck} title="No active route stops" description="Scheduled pickups will appear here once dispatched." />
             ) : (
               <div className="space-y-2.5">
                 {routeStops.map((stop, index) => (

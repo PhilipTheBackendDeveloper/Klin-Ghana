@@ -13,6 +13,9 @@ import { AnalyticsAndReportsView } from './components/admin/AnalyticsAndReportsV
 import { UsersRolesAndSettingsView } from './components/admin/UsersRolesAndSettingsView';
 import { ChatBotAiView } from './components/admin/ChatBotAiView';
 import { UserReportView } from './components/citizen/UserReportView';
+import { CitizenHeader } from './components/citizen/CitizenHeader';
+import { BinAccessView } from './components/citizen/BinAccessView';
+import { CitizenGateView } from './components/citizen/CitizenGateView';
 import { UserBinsView } from './components/citizen/UserBinsView';
 import { UserBinDetailView } from './components/citizen/UserBinDetailView';
 import { UserComplaintsView } from './components/citizen/UserComplaintsView';
@@ -21,12 +24,44 @@ import { Logo } from './components/common/Logo';
 import { SmartBin } from './types';
 import { useSmartBin } from './context/SmartBinContext';
 import { isSupabaseConfigured, supabase } from './services/supabaseClient';
+import type { Session } from '@supabase/supabase-js';
 
 export const App: React.FC = () => {
-  const { bins, setSelectedBinId } = useSmartBin();
+  const { bins, setSelectedBinId, setCitizenBinId, dataMode } = useSmartBin();
   const [currentRoute, setCurrentRoute] = useState('/admin');
   const [selectedBin, setSelectedBin] = useState<SmartBin | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Real auth only applies in live mode against a configured Supabase project;
+  // demo mode keeps its existing no-login-required workflow untouched.
+  const authGateActive = dataMode === 'live' && isSupabaseConfigured();
+  const [authChecked, setAuthChecked] = useState(!authGateActive);
+
+  // /dev/screens and /dev/system expose internal build references and real
+  // infrastructure diagnostics (the actual Supabase project URL, hardware
+  // bring-up status) — they need the same admin auth as /admin/* itself,
+  // not free anonymous access just because they live outside that prefix.
+  const needsAdminAuth = (route: string) => route.startsWith('/admin') || route.startsWith('/dev');
+  const [currentUser, setCurrentUser] = useState<{ fullName: string; email: string } | null>(null);
+
+  // Resolves the topbar's displayed identity from the real signed-in user's
+  // profiles row (falling back to auth metadata/email if the row isn't
+  // readable yet) — rather than ever showing a fixed placeholder name.
+  const loadCurrentUser = async (session: Session | null) => {
+    if (!session?.user) {
+      setCurrentUser(null);
+      return;
+    }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    setCurrentUser({
+      fullName: profile?.full_name || (session.user.user_metadata?.full_name as string | undefined) || session.user.email || 'Admin',
+      email: profile?.email || session.user.email || '',
+    });
+  };
 
   useEffect(() => {
     const handleHashChange = () => setCurrentRoute(window.location.hash.replace('#', '') || '/admin');
@@ -38,6 +73,49 @@ export const App: React.FC = () => {
       window.removeEventListener('popstate', handleHashChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!authGateActive) return;
+
+    supabase.auth.getSession().then(({ data }) => {
+      loadCurrentUser(data.session);
+      setAuthChecked(true);
+    });
+
+    // Reactively bounce to /login the moment a session ends (sign-out here,
+    // expiry, or a sign-out from another tab), and keep the displayed
+    // identity in sync with whoever is actually signed in. Only bounce when
+    // actually on an admin route — this fires on every auth event, including
+    // the initial "no session yet" event Supabase emits on first load, and
+    // the public citizen portal (/user/*) must never redirect to admin login.
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadCurrentUser(session);
+      if (!session && window.location.hash.replace('#', '').startsWith('/admin')) {
+        window.location.hash = '/login';
+        setCurrentRoute('/login');
+      }
+    });
+
+    return () => subscription.subscription.unsubscribe();
+  }, [authGateActive]);
+
+  // Redirect unauthenticated visits to admin routes to the login screen. This
+  // re-checks the session directly, each time an admin route is entered,
+  // rather than trusting a React state snapshot — so a route change fired
+  // immediately after a successful sign-in (before onAuthStateChange has
+  // re-rendered) doesn't race and bounce the user straight back to /login.
+  useEffect(() => {
+    if (!authGateActive || !authChecked || !needsAdminAuth(currentRoute)) return;
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (!data.session) {
+        window.location.hash = '/login';
+        setCurrentRoute('/login');
+      }
+    });
+    return () => { cancelled = true; };
+  }, [authGateActive, authChecked, currentRoute]);
 
   const navigateTo = (route: string) => {
     window.location.hash = route;
@@ -58,6 +136,7 @@ export const App: React.FC = () => {
     }
     setSelectedBin(null);
     setSelectedBinId(null);
+    setCurrentUser(null);
     navigateTo('/login');
   };
 
@@ -69,6 +148,18 @@ export const App: React.FC = () => {
 
   if (currentRoute === '/login') {
     return <LoginView onLogin={(role) => navigateTo(role === 'admin' ? '/admin' : '/user/report')} />;
+  }
+
+  // Avoid flashing admin/dev content while the initial session check is in flight.
+  if (authGateActive && !authChecked && needsAdminAuth(currentRoute)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f6f6f6]">
+        <div className="flex items-center gap-2.5 text-sm font-semibold text-slate-500">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+          Checking session…
+        </div>
+      </div>
+    );
   }
 
   if (currentRoute === '/dev/screens') {
@@ -120,14 +211,64 @@ export const App: React.FC = () => {
     );
   }
 
+  // The real front door of the Citizen Portal — asks for a bin code before
+  // showing anything, rather than dropping visitors straight into a generic
+  // report form with no bin identified. A QR scan (#/bin/:code below)
+  // already supplies the code and skips this gate entirely.
+  if (currentRoute === '/citizen') {
+    return (
+      <div className="min-h-screen bg-white">
+        <CitizenHeader currentRoute={currentRoute} />
+        <CitizenGateView
+          onAccessBin={(code) => navigateTo(`/bin/${code}`)}
+          onBrowseBins={() => navigateTo('/user/bins')}
+          onGeneralReport={() => navigateTo('/user/report')}
+        />
+      </div>
+    );
+  }
+
+  // QR-code deep link: each physical bin gets its own /#/bin/<code> URL,
+  // printed as a sticker. Scanning it lands here — no search, no picking
+  // from a list, one specific bin and one clear next action.
+  if (currentRoute.startsWith('/bin/')) {
+    const scannedCode = currentRoute.split('/').pop() || '';
+    return (
+      <div className="min-h-screen bg-white">
+        <CitizenHeader currentRoute={currentRoute} />
+        <BinAccessView
+          code={scannedCode}
+          onReportProblem={(bin) => {
+            setCitizenBinId(bin.id);
+            navigateTo('/user/report');
+          }}
+          onViewFullDetail={(bin) => openBin(bin, '/user/bins')}
+          onBrowseBins={() => navigateTo('/user/bins')}
+        />
+      </div>
+    );
+  }
+
   if (currentRoute.startsWith('/user')) {
     return (
       <div className="min-h-screen bg-white">
+        <CitizenHeader currentRoute={currentRoute} />
         {currentRoute === '/user/report' && <UserReportView onReportSuccess={() => navigateTo('/user/complaints')} />}
         {currentRoute === '/user/bins' && <main className="mx-auto w-full max-w-5xl p-4 sm:p-6"><UserBinsView onSelectBin={(bin) => openBin(bin, '/user/bins')} /></main>}
         {currentRoute.startsWith('/user/bins/') && (
           <main className="mx-auto w-full max-w-5xl p-4 sm:p-6">
-            {activeBin ? <UserBinDetailView bin={activeBin} onBack={() => navigateTo('/user/bins')} onReportProblem={() => navigateTo('/user/report')} /> : <EmptyDetail onBack={() => navigateTo('/user/bins')} label="No live bin selected" />}
+            {activeBin ? (
+              <UserBinDetailView
+                bin={activeBin}
+                onBack={() => navigateTo('/user/bins')}
+                onReportProblem={() => {
+                  setCitizenBinId(activeBin.id);
+                  navigateTo('/user/report');
+                }}
+              />
+            ) : (
+              <EmptyDetail onBack={() => navigateTo('/user/bins')} label="No live bin selected" />
+            )}
           </main>
         )}
         {currentRoute === '/user/complaints' && <main className="mx-auto w-full max-w-5xl p-4 sm:p-6"><UserComplaintsView /></main>}
@@ -169,6 +310,7 @@ export const App: React.FC = () => {
         <FigmaTopbar
           onLogout={handleLogout}
           onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          user={currentUser}
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {currentRoute === '/admin' && <OperationsCommandCenter onSelectBin={(bin) => openBin(bin, '/admin/bins')} />}

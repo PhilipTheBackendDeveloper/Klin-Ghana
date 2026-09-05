@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, Bot, LogOut, Search, Upload, CheckCircle2, AlertCircle, ArrowRight, Sparkles, MapPin } from 'lucide-react';
+import { Upload, CheckCircle2, ArrowRight, Sparkles, MapPin } from 'lucide-react';
 import { useSmartBin } from '../../context/SmartBinContext';
 
 interface UserReportViewProps {
@@ -9,15 +9,17 @@ interface UserReportViewProps {
 const problems = ['Bin full', 'Overflow', 'Lid problem', 'Sensor issue', 'Other'];
 
 export const UserReportView: React.FC<UserReportViewProps> = ({ onReportSuccess }) => {
-  const { submitCitizenReport, bins } = useSmartBin();
+  const { submitCitizenReport, bins, citizenBinId: scannedBinId } = useSmartBin();
   const [problemType, setProblemType] = useState('Overflow');
-  const [selectedBinId, setSelectedBinId] = useState('');
+  // Pre-fills from whatever bin is active in context — e.g. a citizen who
+  // scanned a bin's QR code and tapped "Report a problem" on that bin's
+  // landing page shouldn't have to find and re-pick it from this dropdown.
+  const [selectedBinId, setSelectedBinId] = useState(scannedBinId || '');
   const [locationText, setLocationText] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'Standard' | 'Urgent'>('Urgent');
   const [evidenceName, setEvidenceName] = useState<string | null>(null);
   const [generatedTicket, setGeneratedTicket] = useState<string | null>(null);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const selectedBin = bins.find((bin) => bin.id === selectedBinId);
 
@@ -39,38 +41,6 @@ export const UserReportView: React.FC<UserReportViewProps> = ({ onReportSuccess 
 
   return (
     <div className="min-h-screen w-full bg-slate-50 font-['Plus_Jakarta_Sans',sans-serif]">
-      {/* Citizen Header */}
-      <header className="sticky top-0 z-30 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 py-3.5 shadow-xs">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <a href="#/user/report" className="flex items-center gap-1.5" aria-label="KlinGhana home">
-            <span className="text-xl font-extrabold tracking-tight text-[#1174e6] font-['Outfit',sans-serif]">
-              KlinGh<span className="inline-flex items-center justify-center w-5 h-5 mx-0.5 rounded bg-[#1174e6] text-white text-[11px] font-black">K</span>na
-            </span>
-          </a>
-
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-6 text-xs font-semibold">
-            <a href="#/user/bins" className="text-slate-600 hover:text-slate-900 transition-colors">Nearby bins</a>
-            <a href="#/user/report" className="text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">Report issue</a>
-            <a href="#/user/complaints" className="text-slate-600 hover:text-slate-900 transition-colors">My complaints</a>
-            <a href="#/admin/ai" className="text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1">
-              <Bot className="w-3.5 h-3.5 text-blue-600" />
-              <span>AI Assistant</span>
-            </a>
-          </nav>
-
-          {/* Right Actions */}
-          <div className="flex items-center gap-3">
-            <a
-              href="#/login"
-              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-            >
-              Admin Portal
-            </a>
-          </div>
-        </div>
-      </header>
-
       {/* Main Container */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Title & Introduction */}
@@ -125,8 +95,13 @@ export const UserReportView: React.FC<UserReportViewProps> = ({ onReportSuccess 
           {/* Section 2: Bin / Location Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Target Bin (Live Assets)
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1.5">
+                <span>Target Bin (Live Assets)</span>
+                {selectedBinId && selectedBinId === scannedBinId && (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700 border border-emerald-200">
+                    Pre-filled from your scan
+                  </span>
+                )}
               </label>
               <select
                 value={selectedBinId}

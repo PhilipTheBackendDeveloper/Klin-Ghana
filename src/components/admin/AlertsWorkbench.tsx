@@ -1,7 +1,10 @@
 import React from 'react';
-import { CheckCircle2, Clock, Filter } from 'lucide-react';
+import { CheckCircle2, Clock, Filter, Siren, TriangleAlert, Radar, Timer } from 'lucide-react';
 import { useSmartBin } from '../../context/SmartBinContext';
 import { AlertNotification } from '../../types';
+import { PageHeader } from '../common/PageHeader';
+import { StatCard } from '../common/StatCard';
+import { EmptyState } from '../common/EmptyState';
 
 const formatTime = (iso: string) => {
   const date = new Date(iso);
@@ -46,34 +49,20 @@ export const AlertsWorkbench: React.FC = () => {
 
   return (
     <div className="space-y-6 font-['Plus_Jakarta_Sans',sans-serif]">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-3xl border border-rose-200/80 bg-white p-5 shadow-sm">
-          <span className="text-xs font-bold text-rose-700">P1 ACTIVE</span>
-          <div className="font-['Outfit',sans-serif] mt-1 text-3xl font-black text-rose-600">{criticalIncidents.length}</div>
-          <span className="text-[11px] font-bold text-rose-600">Requires dispatch</span>
-        </div>
-        <div className="rounded-3xl border border-amber-200/80 bg-white p-5 shadow-sm">
-          <span className="text-xs font-bold text-amber-700">WARNINGS</span>
-          <div className="font-['Outfit',sans-serif] mt-1 text-3xl font-black text-amber-600">{warningIncidents.length}</div>
-          <span className="text-[11px] font-bold text-amber-600">Near threshold</span>
-        </div>
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
-          <span className="text-xs font-bold text-slate-500">MONITORING</span>
-          <div className="font-['Outfit',sans-serif] mt-1 text-3xl font-black text-emerald-600">{monitoringIncidents.length}</div>
-          <span className="text-[11px] font-bold text-emerald-600">Live unresolved</span>
-        </div>
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
-          <span className="text-xs font-bold text-slate-500">MEAN ACK</span>
-          <div className="font-['Outfit',sans-serif] mt-1 text-3xl font-black text-slate-900">{meanAck}</div>
-          <span className="text-[11px] text-slate-400">Calculated when ack timestamps exist</span>
-        </div>
+      <PageHeader title="Alerts & Incidents" subtitle="Real-time triage board for fleet warnings, overflows, and offline devices." />
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
+        <StatCard icon={Siren} label="P1 active" value={String(criticalIncidents.length)} tone="rose" note="Requires dispatch" />
+        <StatCard icon={TriangleAlert} label="Warnings" value={String(warningIncidents.length)} tone="amber" note="Near threshold" />
+        <StatCard icon={Radar} label="Monitoring" value={String(monitoringIncidents.length)} tone="emerald" note="Live unresolved" />
+        <StatCard icon={Timer} label="Mean ack" value={meanAck} tone="slate" note="Time to acknowledge" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="space-y-4 lg:col-span-8">
           <div className="flex items-center justify-between">
             <h3 className="font-['Outfit',sans-serif] text-base font-bold text-slate-900">Incident Board - Real-time Triage</h3>
-            <span className="inline-flex items-center gap-1 text-xs text-slate-400"><Filter className="h-3.5 w-3.5" /> Supabase active alerts</span>
+            <span className="inline-flex items-center gap-1 text-xs text-slate-400"><Filter className="h-3.5 w-3.5" /> Active alerts</span>
           </div>
 
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
@@ -111,11 +100,7 @@ export const AlertsWorkbench: React.FC = () => {
 
           <div className="space-y-3.5 text-xs">
             {timelineLogs.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-slate-500">
-                <CheckCircle2 className="mx-auto mb-2 h-5 w-5 text-emerald-500" />
-                <div className="font-bold text-slate-900">No active incidents</div>
-                <p className="mt-1 text-[11px]">The live alerts table returned no unresolved alerts.</p>
-              </div>
+              <EmptyState icon={CheckCircle2} title="No active incidents" description="Every alert is currently resolved." compact />
             ) : timelineLogs.map((alert) => (
               <div key={alert.id} className="flex gap-3">
                 <span className="mt-0.5 shrink-0 font-mono text-[11px] text-slate-400">{formatTime(alert.timestamp)}</span>
@@ -133,9 +118,6 @@ export const AlertsWorkbench: React.FC = () => {
 };
 
 const EmptyColumn: React.FC<{ label: string }> = ({ label }) => (
-  <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-center text-[11px] text-slate-500">
-    <Clock className="mx-auto mb-1 h-4 w-4 text-slate-300" />
-    {label}
-  </div>
+  <EmptyState icon={Clock} title={label} compact className="bg-white" />
 );
 

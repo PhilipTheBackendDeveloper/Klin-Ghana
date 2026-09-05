@@ -1,8 +1,13 @@
 import React from 'react';
-import { RefreshCw, CheckCircle2, AlertTriangle, Route, Trash2, ArrowUpRight, Activity, MapPin } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertTriangle, Route, Trash2, ArrowUpRight, Activity, MapPin, HeartPulse, WifiOff, ShieldAlert } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { SmartBin } from '../../types';
 import { useSmartBin } from '../../context/SmartBinContext';
+import { MAP_TILE_URL, MAP_LABELS_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_MAX_ZOOM, MAP_LABELS_MAX_ZOOM, createBinMarkerIcon } from '../map/mapTiles';
+import { MapAutoSize } from '../map/MapAutoSize';
+import { StatCard } from '../common/StatCard';
+import { EmptyState } from '../common/EmptyState';
+import { BinLocationLabel } from '../common/BinLocationLabel';
 
 const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
   const map = useMap();
@@ -59,11 +64,11 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
   };
 
   const kpis = [
-    { label: 'FLEET HEALTH', value: `${fleetHealth.toFixed(1)}%`, dot: '#21e6a2', route: '/admin/bins', textColor: 'text-emerald-600' },
-    { label: 'OVERFLOW', value: String(overflowCount), dot: '#ff4d74', route: '/admin/alerts', textColor: overflowCount > 0 ? 'text-rose-600' : 'text-slate-900' },
-    { label: 'OFFLINE', value: String(offlineCount), dot: '#6b86ff', route: '/admin/bins', textColor: offlineCount > 0 ? 'text-indigo-600' : 'text-slate-900' },
-    { label: 'SLA RISK', value: String(slaRiskCount), dot: '#ffb23e', route: '/admin/complaints', textColor: slaRiskCount > 0 ? 'text-amber-600' : 'text-slate-900' },
-    { label: 'ROUTE LOAD', value: `${routeLoad}%`, dot: '#18d8ff', route: '/admin/routes', textColor: 'text-cyan-600' },
+    { label: 'Fleet health', value: `${fleetHealth.toFixed(1)}%`, icon: HeartPulse, tone: 'emerald' as const, route: '/admin/bins' },
+    { label: 'Overflow', value: String(overflowCount), icon: AlertTriangle, tone: overflowCount > 0 ? 'rose' as const : 'slate' as const, route: '/admin/alerts' },
+    { label: 'Offline', value: String(offlineCount), icon: WifiOff, tone: offlineCount > 0 ? 'indigo' as const : 'slate' as const, route: '/admin/bins' },
+    { label: 'SLA risk', value: String(slaRiskCount), icon: ShieldAlert, tone: slaRiskCount > 0 ? 'amber' as const : 'slate' as const, route: '/admin/complaints' },
+    { label: 'Route load', value: `${routeLoad}%`, icon: Route, tone: 'cyan' as const, route: '/admin/routes' },
   ];
 
   return (
@@ -117,20 +122,14 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
       {/* KPI Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {kpis.map((kpi) => (
-          <button
-            type="button"
+          <StatCard
             key={kpi.label}
+            icon={kpi.icon}
+            label={kpi.label}
+            value={kpi.value}
+            tone={kpi.tone}
             onClick={() => { window.location.hash = kpi.route; }}
-            className="group flex flex-col justify-between p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all text-left"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">{kpi.label}</span>
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: kpi.dot }} />
-            </div>
-            <div className={`font-['Outfit',sans-serif] mt-2 text-2xl sm:text-3xl font-black ${kpi.textColor}`}>
-              {kpi.value}
-            </div>
-          </button>
+          />
         ))}
       </div>
 
@@ -151,11 +150,18 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
           </div>
 
           <div className="relative mt-3 h-[320px] sm:h-[380px] w-full overflow-hidden rounded-2xl border border-slate-200 shadow-inner">
-            <MapContainer center={mapCenter} zoom={13} scrollWheelZoom={false} className="h-full w-full">
-              <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <MapContainer center={mapCenter} zoom={13} maxZoom={MAP_MAX_ZOOM} scrollWheelZoom={false} className="h-full w-full">
+              <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} maxZoom={MAP_MAX_ZOOM} />
+              <TileLayer url={MAP_LABELS_TILE_URL} maxZoom={MAP_LABELS_MAX_ZOOM} />
+              <MapAutoSize />
               {gpsBins[0] && <MapRecenter center={[gpsBins[0].location.lat, gpsBins[0].location.lng]} />}
               {gpsBins.map((bin) => (
-                <Marker key={bin.id} position={[bin.location.lat, bin.location.lng]} eventHandlers={{ click: () => selectBin(bin) }}>
+                <Marker
+                  key={bin.id}
+                  position={[bin.location.lat, bin.location.lng]}
+                  icon={createBinMarkerIcon(bin, { active: targetBin?.id === bin.id })}
+                  eventHandlers={{ click: () => selectBin(bin) }}
+                >
                   <Popup>
                     <div className="p-1 text-xs">
                       <strong>{bin.code} - {bin.name}</strong>
@@ -196,9 +202,8 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
                   <div className="text-base sm:text-lg font-bold text-blue-600 group-hover:underline">
                     {targetBin.code} - {targetBin.name}
                   </div>
-                  <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{targetBin.location.address || targetBin.location.city}</span>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    <BinLocationLabel bin={targetBin} />
                   </div>
                 </button>
 
@@ -228,9 +233,7 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
                 </div>
               </div>
             ) : (
-              <div className="py-8 text-center text-xs text-slate-400">
-                No asset selected.
-              </div>
+              <EmptyState icon={MapPin} title="No asset selected" description="Pick a bin on the map or from the register." compact />
             )}
           </div>
 
@@ -248,7 +251,7 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
             </div>
 
             {shownAlerts.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-400">No unresolved live alerts.</div>
+              <EmptyState icon={CheckCircle2} title="No unresolved alerts" description="The fleet is quiet right now." compact />
             ) : (
               <div className="space-y-2">
                 {shownAlerts.map((alert) => (
@@ -308,7 +311,9 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
               <tbody className="divide-y divide-slate-100">
                 {shownReports.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-400">No unresolved citizen complaints.</td>
+                    <td colSpan={5} className="py-2">
+                      <EmptyState icon={CheckCircle2} title="No unresolved citizen complaints" compact />
+                    </td>
                   </tr>
                 ) : (
                   shownReports.map((report) => (

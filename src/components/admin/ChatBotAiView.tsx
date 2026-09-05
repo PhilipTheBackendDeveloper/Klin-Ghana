@@ -23,7 +23,7 @@ const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minut
 export const ChatBotAiView: React.FC = () => {
   const { bins, alerts, fleetHealth, overflowCount, routeStops } = useSmartBin();
   const [messages, setMessages] = React.useState<ChatMessage[]>([
-    { id: 1, sender: 'assistant', text: 'Ask about the live fleet. I will only summarize records loaded from Supabase in this session.', time: nowTime() },
+    { id: 1, sender: 'assistant', text: 'Ask about the fleet — bin fill levels, active alerts, or today’s route. I only summarize data already loaded in this session.', time: nowTime() },
   ]);
   const [inputText, setInputText] = React.useState('');
 
@@ -81,7 +81,7 @@ export const ChatBotAiView: React.FC = () => {
             <p className="text-xs text-slate-500">Read-only fleet telemetry analysis and dispatch assistance</p>
           </div>
         </div>
-        <span className="rounded-full bg-blue-50 px-2.5 py-1 font-mono text-[10px] font-bold text-blue-700">Live data only</span>
+        <span className="rounded-full bg-blue-50 px-2.5 py-1 font-mono text-[10px] font-bold text-blue-700">Fleet-data only</span>
       </div>
 
       <div className="flex min-h-[500px] flex-col justify-between space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

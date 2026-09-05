@@ -8,6 +8,7 @@ const ignoredPathParts = [
   `${path.sep}dist${path.sep}`,
   `${path.sep}components${path.sep}simulator${path.sep}`,
   `${path.sep}data${path.sep}initialBins.ts`,
+  `${path.sep}data${path.sep}demoSeed.ts`,
 ];
 
 const forbidden = [

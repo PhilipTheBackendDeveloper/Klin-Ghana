@@ -13,6 +13,7 @@ import {
   X,
   Sparkles,
 } from 'lucide-react';
+import { Logo } from '../common/Logo';
 
 interface FigmaSidebarProps {
   currentView: string;
@@ -55,9 +56,7 @@ export const FigmaSidebar: React.FC<FigmaSidebarProps> = ({
             className="flex items-center gap-1.5 text-left group"
             aria-label="KlinGhana overview"
           >
-            <span className="text-xl font-extrabold tracking-tight text-[#1174e6] font-['Outfit',sans-serif]">
-              KlinGh<span className="inline-flex items-center justify-center w-5 h-5 mx-0.5 rounded bg-[#1174e6] text-white text-[11px] font-black">K</span>na
-            </span>
+            <Logo size="sm" />
           </button>
           {onCloseMobile && (
             <button
