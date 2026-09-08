@@ -20,6 +20,7 @@ import { UserBinsView } from './components/citizen/UserBinsView';
 import { UserBinDetailView } from './components/citizen/UserBinDetailView';
 import { UserComplaintsView } from './components/citizen/UserComplaintsView';
 import { SystemDiagnosticsView } from './components/dev/SystemDiagnosticsView';
+import { LandingView } from './components/marketing/LandingView';
 import { Logo } from './components/common/Logo';
 import { SmartBin } from './types';
 import { useSmartBin } from './context/SmartBinContext';
@@ -28,7 +29,7 @@ import type { Session } from '@supabase/supabase-js';
 
 export const App: React.FC = () => {
   const { bins, setSelectedBinId, setCitizenBinId, dataMode } = useSmartBin();
-  const [currentRoute, setCurrentRoute] = useState('/admin');
+  const [currentRoute, setCurrentRoute] = useState('/');
   const [selectedBin, setSelectedBin] = useState<SmartBin | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -64,7 +65,7 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const handleHashChange = () => setCurrentRoute(window.location.hash.replace('#', '') || '/admin');
+    const handleHashChange = () => setCurrentRoute(window.location.hash.replace('#', '') || '/');
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('popstate', handleHashChange);
@@ -146,6 +147,18 @@ export const App: React.FC = () => {
     navigateTo(`${baseRoute}/${bin.code}`);
   };
 
+  // The public marketing homepage — no auth, no data mode gate. It only ever
+  // hands off to /login (admin) or /citizen (residents); every real screen
+  // still lives behind those two doors exactly as before.
+  if (currentRoute === '/') {
+    return (
+      <LandingView
+        onAdminSignIn={() => navigateTo('/login')}
+        onReportIssue={() => navigateTo('/citizen')}
+      />
+    );
+  }
+
   if (currentRoute === '/login') {
     return <LoginView onLogin={(role) => navigateTo(role === 'admin' ? '/admin' : '/user/report')} />;
   }
@@ -164,6 +177,7 @@ export const App: React.FC = () => {
 
   if (currentRoute === '/dev/screens') {
     const screens = [
+      { name: '0. Public Landing Page', node: 'MKT:HOME', route: '/' },
       { name: '1. Login Screen', node: '57:12', route: '/login' },
       { name: '2. Operations Command Center', node: '64:2', route: '/admin' },
       { name: '3. Bins & Locations', node: '75:242', route: '/admin/bins' },
