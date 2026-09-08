@@ -95,11 +95,23 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
             <span>{dataMode === 'demo' ? 'Demo data' : dataStatus}</span>
           </button>
 
-          {/* GPS Sync Badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-cyan-300 bg-cyan-50 text-cyan-700 text-xs font-bold">
-            <span className="w-2 h-2 rounded-full bg-cyan-500" />
-            <span>{bins.some((bin) => bin.gpsFix) ? 'GPS sync' : 'No GPS'}</span>
-          </div>
+          {/* GPS Sync Badge — bins only ever get a new fix by pushing telemetry
+              themselves (there's no remote "request location" channel to the
+              hardware yet), so this re-pulls the latest stored fix from the
+              database rather than pretending to reach out to the device. A
+              live Supabase subscription already refreshes this automatically
+              the moment new telemetry lands; this is the manual "just in
+              case" affordance, same action as the status badge beside it. */}
+          <button
+            type="button"
+            onClick={refreshLiveData}
+            disabled={dataMode === 'live' && dataStatus === 'loading'}
+            title="Re-check the database for each bin's latest known GPS fix"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-cyan-300 bg-cyan-50 text-cyan-700 text-xs font-bold hover:bg-cyan-100 transition-colors disabled:opacity-70 disabled:cursor-wait"
+          >
+            <RefreshCw className={`w-3 h-3 ${dataMode === 'live' && dataStatus === 'loading' ? 'animate-spin' : ''}`} />
+            <span>{dataStatus === 'loading' ? 'Syncing…' : bins.some((bin) => bin.gpsFix) ? 'GPS sync' : 'No GPS'}</span>
+          </button>
 
           {/* Telemetry Timestamp Badge */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-500 text-xs font-medium shadow-2xs">
