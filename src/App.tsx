@@ -29,7 +29,10 @@ import type { Session } from '@supabase/supabase-js';
 
 export const App: React.FC = () => {
   const { bins, setSelectedBinId, setCitizenBinId, dataMode } = useSmartBin();
-  const [currentRoute, setCurrentRoute] = useState('/');
+  // Read the hash synchronously on first render (not in an effect) so a page
+  // refresh on e.g. #/admin doesn't paint the landing page for a frame before
+  // snapping to the real route.
+  const [currentRoute, setCurrentRoute] = useState(() => window.location.hash.replace('#', '') || '/');
   const [selectedBin, setSelectedBin] = useState<SmartBin | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -65,8 +68,9 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // Initial route is already read in useState above; this only tracks
+    // subsequent navigation (back/forward, hash links).
     const handleHashChange = () => setCurrentRoute(window.location.hash.replace('#', '') || '/');
-    handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('popstate', handleHashChange);
     return () => {
