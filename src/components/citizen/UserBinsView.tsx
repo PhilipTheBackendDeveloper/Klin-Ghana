@@ -63,7 +63,7 @@ export const UserBinsView: React.FC<UserBinsViewProps> = ({ onSelectBin }) => {
             <button key={bin.id} type="button" onClick={() => onSelectBin(bin)} className="space-y-3 rounded-3xl border border-slate-200/80 bg-white p-5 text-left shadow-sm transition-all hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="rounded-lg bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-600">{bin.code}</span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${bin.currentFillLevel >= 95 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{bin.currentFillLevel >= 95 ? 'Overflow' : 'Available'}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${bin.status === 'offline' ? 'bg-slate-100 text-slate-600' : bin.currentFillLevel >= 95 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{bin.status === 'offline' ? 'Offline' : bin.currentFillLevel >= 95 ? 'Overflow' : 'Available'}</span>
               </div>
               <div><h4 className="text-sm font-bold text-slate-900">{bin.name}</h4><p className="mt-0.5 text-xs text-slate-500"><BinLocationLabel bin={bin} /></p></div>
               <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs"><div><span className="text-slate-400">Fill: </span><strong className={bin.currentFillLevel >= 95 ? 'text-rose-600' : 'text-slate-900'}>{bin.currentFillLevel}%</strong></div><span className="flex items-center gap-0.5 text-xs font-bold text-blue-600">View Bin <ArrowRight className="h-3.5 w-3.5" /></span></div>

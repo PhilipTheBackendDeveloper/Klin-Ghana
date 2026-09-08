@@ -98,8 +98,26 @@ const getDemoValue = <T,>(key: string, fallback: T): T => {
   }
 };
 
+// The ESP32 reports every ~12s while it's alive (see firmware
+// TELEMETRY_INTERVAL_MS), but a device that has lost power, Wi-Fi, or
+// cloud reachability has no way to tell the server it went dark — it just
+// stops sending. `connection_status`/`bin_status` in bin_current_state are
+// therefore whatever the *last accepted packet* said (often still
+// "ONLINE"), and never flip back on their own. Recency is the only
+// reliable signal, so a bin whose last telemetry is older than this is
+// treated as offline regardless of what those stored columns claim.
+const STALE_AFTER_MS = 3 * 60 * 1000;
+
+const isBinStale = (state: any): boolean => {
+  const lastSeen = state?.last_seen_at || state?.telemetry_received_at || state?.updated_at;
+  if (!lastSeen) return true;
+  const lastSeenMs = new Date(lastSeen).getTime();
+  return Number.isNaN(lastSeenMs) || Date.now() - lastSeenMs > STALE_AFTER_MS;
+};
+
 const uiStatusFromDb = (state: any): SmartBin['status'] => {
-  if (state?.connection_status === 'OFFLINE' || state?.bin_status === 'OFFLINE') return 'offline';
+  if (!state || isBinStale(state)) return 'offline';
+  if (state.connection_status === 'OFFLINE' || state.bin_status === 'OFFLINE') return 'offline';
   return calculateUiStatus(Number(state?.fill_percentage ?? 0));
 };
 
@@ -130,9 +148,9 @@ const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
     batteryLevel: state?.battery_percentage ?? null,
     temperature: state?.temperature_c ?? null,
     wifiSignal: state?.wifi_rssi ?? null,
-    wifiConnected: state?.connection_status === 'ONLINE',
+    wifiConnected: Boolean(state) && state.connection_status === 'ONLINE' && !isBinStale(state),
     firmwareVersion: state?.firmware_version || undefined,
-    lastUpdated: state?.updated_at || state?.telemetry_received_at || row.updated_at,
+    lastUpdated: state?.last_seen_at || state?.telemetry_received_at || state?.updated_at || row.updated_at,
     gpsFix: hasGpsFix,
     gpsAccuracyM: state?.gps_accuracy_m ?? null,
     gpsSatellites: state?.satellites ?? null,
@@ -140,7 +158,7 @@ const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
     telemetryMessageId: state?.message_id || undefined,
     telemetrySequence: state?.last_message_sequence ?? state?.message_sequence ?? undefined,
     assignedZone: row.zone || undefined,
-    notes: state ? undefined : 'No telemetry received',
+    notes: !state ? 'No telemetry received' : isBinStale(state) ? 'Device has gone quiet — no telemetry received recently' : undefined,
   } as SmartBin;
 });
 
