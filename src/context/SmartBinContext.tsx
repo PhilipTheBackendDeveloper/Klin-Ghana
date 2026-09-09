@@ -124,8 +124,8 @@ const uiStatusFromDb = (state: any): SmartBin['status'] => {
 const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
   const state = Array.isArray(row.bin_current_state) ? row.bin_current_state[0] : row.bin_current_state;
   const hasGpsFix = Boolean(state?.gps_fix && state?.latitude != null && state?.longitude != null && Number(state.latitude) !== 0 && Number(state.longitude) !== 0);
-  const latitude = hasGpsFix ? Number(state.latitude) : (row.latitude ? Number(row.latitude) : (state?.latitude ? Number(state.latitude) : 6.6885));
-  const longitude = hasGpsFix ? Number(state.longitude) : (row.longitude ? Number(row.longitude) : (state?.longitude ? Number(state.longitude) : -1.6244));
+  const latitude = hasGpsFix ? Number(state.latitude) : (row.latitude != null ? Number(row.latitude) : (state?.latitude != null ? Number(state.latitude) : 0));
+  const longitude = hasGpsFix ? Number(state.longitude) : (row.longitude != null ? Number(row.longitude) : (state?.longitude != null ? Number(state.longitude) : 0));
   return {
     id: row.id,
     code: row.code,

@@ -164,8 +164,8 @@ export async function handleTelemetryIngestion(
 
       if (binLookup?.data) {
         const binRecord = binLookup.data;
-        const finalLat = hasGpsFix ? validData.latitude : (binRecord.latitude ?? 6.6885);
-        const finalLng = hasGpsFix ? validData.longitude : (binRecord.longitude ?? -1.6244);
+        const finalLat = hasGpsFix ? validData.latitude : (binRecord.latitude ?? null);
+        const finalLng = hasGpsFix ? validData.longitude : (binRecord.longitude ?? null);
 
         const commonRow = {
           bin_id: binRecord.id,
@@ -183,7 +183,7 @@ export async function handleTelemetryIngestion(
           gps_accuracy_m: hasGpsFix ? validData.gpsAccuracyM : null,
           gps_fix: hasGpsFix,
           satellites: validData.satellites ?? 0,
-          location_source: hasGpsFix ? 'GPS' : 'UNKNOWN',
+          location_source: hasGpsFix ? 'GPS' : (binRecord.latitude != null ? 'BENCH_REGISTERED' : 'UNKNOWN'),
           firmware_version: validData.firmwareVersion || '1.0.0-prod',
           message_id: messageId,
           message_sequence: sequenceNum,
@@ -215,6 +215,8 @@ export async function handleTelemetryIngestion(
           last_seen_at: nowIso,
           telemetry_received_at: nowIso,
           updated_at: nowIso,
+          last_message_sequence: sequenceNum,
+          gps_updated_at: hasGpsFix ? (validData.gpsUpdatedAt || nowIso) : null,
         }, { onConflict: 'bin_id' });
         if (stateError) {
           console.error('[TELEMETRY] bin_current_state upsert error:', stateError);
@@ -232,20 +234,37 @@ export async function handleTelemetryIngestion(
         }
 
         if (hasGpsFix) {
-          await supabase.from('bins').update({
+          const { error: binUpdateError } = await supabase.from('bins').update({
             latitude: finalLat,
             longitude: finalLng,
             updated_at: nowIso,
           }).eq('id', binRecord.id);
+          if (binUpdateError) {
+            console.warn('[TELEMETRY] bins coordinate update warning:', binUpdateError);
+          }
         }
 
-        await supabase.from('devices').upsert({
+        const { error: deviceError } = await supabase.from('devices').upsert({
           device_id: deviceId,
           bin_id: binRecord.id,
           firmware_version: validData.firmwareVersion || '1.0.0-prod',
           is_active: true,
           last_heartbeat: nowIso,
         }, { onConflict: 'device_id' });
+        if (deviceError) {
+          console.error('[TELEMETRY] device heartbeat upsert error:', deviceError);
+          return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: {
+              ok: false,
+              success: false,
+              accepted: false,
+              error: 'DATABASE_ERROR',
+              message: `Failed to update device heartbeat: ${deviceError.message}`,
+            },
+          };
+        }
 
         // Alert Evaluation
         const fillAlertTypes = ['NEAR_FULL', 'FULL', 'OVERFLOW'];
