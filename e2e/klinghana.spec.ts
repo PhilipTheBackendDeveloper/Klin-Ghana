@@ -104,12 +104,13 @@ test.describe('KlinGhana E2E Acceptance Suite', () => {
     await page.goto('/#/user/complaints');
     await expect(page.locator('text=Complaints Workbench')).toBeVisible();
 
-    // 8. Logout
+    // 8. Logout — a deliberate sign-out lands on the public homepage, not
+    // back on the login form.
     await page.goto('/#/admin');
     const logoutBtn = page.locator('button[aria-label="Logout"]').first();
     if (await logoutBtn.isVisible()) {
       await logoutBtn.click();
-      await expect(page).toHaveURL(/.*#\/login/);
+      await expect(page).toHaveURL(/.*#\/$/);
     }
 
     // Filter non-fatal network messages

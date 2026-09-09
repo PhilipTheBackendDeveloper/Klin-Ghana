@@ -142,7 +142,11 @@ export const App: React.FC = () => {
     setSelectedBin(null);
     setSelectedBinId(null);
     setCurrentUser(null);
-    navigateTo('/login');
+    // A deliberate sign-out lands back on the public homepage, not the
+    // login form — that's for the session-expiry/unauthorized-access
+    // guards below, which still send straight to /login since re-auth is
+    // exactly what those need.
+    navigateTo('/');
   };
 
   const openBin = (bin: SmartBin, baseRoute: '/admin/bins' | '/user/bins') => {
