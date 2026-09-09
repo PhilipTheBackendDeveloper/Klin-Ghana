@@ -1,15 +1,28 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 // This handler is the only place in the codebase that touches
-// ANTHROPIC_API_KEY. It must only ever run server-side (Vite dev
+// CLOUDFLARE_API_TOKEN. It must only ever run server-side (Vite dev
 // middleware, or a Vercel serverless function) — never import this from
 // src/ code that ships to the browser.
-const getAnthropicClient = (): Anthropic | null => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  return new Anthropic({ apiKey });
+//
+// Uses Cloudflare Workers AI (https://developers.cloudflare.com/workers-ai/)
+// instead of a paid model — its free tier (10,000 "neurons"/day as of this
+// writing) needs only a free Cloudflare account, no credit card. Swap
+// WORKERS_AI_MODEL below to any other text-generation model in Cloudflare's
+// catalog if you want a different quality/speed/limit tradeoff.
+const WORKERS_AI_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+
+interface WorkersAiConfig {
+  accountId: string;
+  apiToken: string;
+}
+
+const getWorkersAiConfig = (): WorkersAiConfig | null => {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+  if (!accountId || !apiToken) return null;
+  return { accountId, apiToken };
 };
 
 const getServiceClient = () => {
@@ -118,6 +131,12 @@ const buildSystemPrompt = (fleet: z.infer<typeof ChatRequestSchema>['fleet']): s
   ].join('\n');
 };
 
+interface WorkersAiResponse {
+  success: boolean;
+  errors?: { code: number; message: string }[];
+  result?: { response?: string };
+}
+
 export async function handleAiAssistantChat(
   headers: Record<string, string | string[] | undefined>,
   rawBody: string | Record<string, unknown>
@@ -128,9 +147,9 @@ export async function handleAiAssistantChat(
     return typeof val === 'string' ? val : '';
   };
 
-  // Require a signed-in session (any role) — this endpoint spends real
-  // money per request, and it's otherwise a publicly reachable URL. Fail
-  // closed (like adminHandler.ts) if identity can't even be checked,
+  // Require a signed-in session (any role) — this endpoint calls out to a
+  // rate-limited free tier, and it's otherwise a publicly reachable URL.
+  // Fail closed (like adminHandler.ts) if identity can't even be checked,
   // rather than silently letting unauthenticated requests through.
   const supabase = getServiceClient();
   if (!supabase) {
@@ -145,9 +164,9 @@ export async function handleAiAssistantChat(
     return { statusCode: 401, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'UNAUTHORIZED', message: 'Invalid or expired session.' } };
   }
 
-  const client = getAnthropicClient();
-  if (!client) {
-    return { statusCode: 500, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'NOT_CONFIGURED', message: 'Server is missing ANTHROPIC_API_KEY.' } };
+  const workersAi = getWorkersAiConfig();
+  if (!workersAi) {
+    return { statusCode: 500, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'NOT_CONFIGURED', message: 'Server is missing CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN.' } };
   }
 
   let payload: unknown;
@@ -164,34 +183,44 @@ export async function handleAiAssistantChat(
   const { message, history, fleet } = parsed.data;
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-opus-5',
-      max_tokens: 1024,
-      output_config: { effort: 'medium' },
-      system: buildSystemPrompt(fleet),
-      messages: [
-        ...history.map((m) => ({ role: m.role, content: m.text }) as Anthropic.MessageParam),
-        { role: 'user', content: message },
-      ],
-    });
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${workersAi.accountId}/ai/run/${WORKERS_AI_MODEL}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${workersAi.apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: buildSystemPrompt(fleet) },
+            ...history.map((m) => ({ role: m.role, content: m.text })),
+            { role: 'user', content: message },
+          ],
+        }),
+      }
+    );
 
-    const textBlock = response.content.find((block): block is Anthropic.TextBlock => block.type === 'text');
-    const text = textBlock?.text?.trim();
+    if (res.status === 401 || res.status === 403) {
+      return { statusCode: 500, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'AUTH_FAILED', message: 'Server has an invalid CLOUDFLARE_API_TOKEN.' } };
+    }
+    if (res.status === 429) {
+      return { statusCode: 429, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'RATE_LIMITED', message: 'Free daily AI quota reached — try again tomorrow, or upgrade the Cloudflare account.' } };
+    }
+
+    const data = (await res.json().catch(() => null)) as WorkersAiResponse | null;
+    if (!res.ok || !data?.success) {
+      const errorMessage = data?.errors?.[0]?.message || `Workers AI request failed (HTTP ${res.status}).`;
+      return { statusCode: 502, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'UPSTREAM_ERROR', message: errorMessage } };
+    }
+
+    const text = data.result?.response?.trim();
     if (!text) {
       return { statusCode: 502, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'EMPTY_RESPONSE', message: 'The assistant returned no text.' } };
     }
 
     return { statusCode: 200, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: true, text } };
   } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) {
-      return { statusCode: 429, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'RATE_LIMITED', message: 'The assistant is busy — try again shortly.' } };
-    }
-    if (err instanceof Anthropic.AuthenticationError) {
-      return { statusCode: 500, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'AUTH_FAILED', message: 'Server has an invalid ANTHROPIC_API_KEY.' } };
-    }
-    if (err instanceof Anthropic.APIError) {
-      return { statusCode: 502, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'UPSTREAM_ERROR', message: err.message } };
-    }
     return { statusCode: 500, headers: AI_ASSISTANT_CORS_HEADERS, body: { ok: false, error: 'INTERNAL_ERROR', message: err instanceof Error ? err.message : 'Unknown error.' } };
   }
 }
