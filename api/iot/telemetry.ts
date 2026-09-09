@@ -1,4 +1,4 @@
-﻿import { handleTelemetryIngestion } from '../../src/server/iotHandler.ts';
+import { handleTelemetryIngestion } from '../../src/server/iotHandler';
 
 export default async function handler(req: any, res?: any) {
   const headers: Record<string, string> = {

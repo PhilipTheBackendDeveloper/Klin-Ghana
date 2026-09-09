@@ -5,8 +5,8 @@ import {
   isStaleSequence,
   normalizeDeviceId,
   TelemetryPayloadSchema,
-} from '../shared/telemetryContract.ts';
-import { verifyDeviceCredential } from './deviceCredentials.ts';
+} from '../shared/telemetryContract';
+import { verifyDeviceCredential } from './deviceCredentials';
 
 type SupabaseError = { code?: string; message: string };
 type SupabaseResult<T = unknown> = { data: T | null; error: SupabaseError | null };
