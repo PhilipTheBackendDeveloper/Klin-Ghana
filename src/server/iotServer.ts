@@ -1,7 +1,7 @@
-import http, { IncomingMessage, ServerResponse } from 'http';
-import { handleHealthCheck, handleTelemetryIngestion } from './iotHandler';
+﻿import http, { IncomingMessage, ServerResponse } from 'http';
+import { handleHealthCheck, handleTelemetryIngestion, IotHandlerDeps } from './iotHandler';
 
-export const createIotServer = (port: number = 3001): http.Server => {
+export const createIotServer = (port: number = 3001, deps: IotHandlerDeps = {}): http.Server => {
   const server = http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = req.url?.split('?')[0];
 
@@ -26,7 +26,7 @@ export const createIotServer = (port: number = 3001): http.Server => {
       let body = '';
       req.on('data', (chunk: any) => { body += chunk; });
       req.on('end', async () => {
-        const result = await handleTelemetryIngestion(req.headers, body);
+        const result = await handleTelemetryIngestion(req.headers, body, deps);
         res.writeHead(result.statusCode, result.headers);
         res.end(JSON.stringify(result.body));
       });
@@ -39,3 +39,4 @@ export const createIotServer = (port: number = 3001): http.Server => {
 
   return server;
 };
+

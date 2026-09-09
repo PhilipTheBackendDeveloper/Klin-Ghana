@@ -1,10 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+﻿import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 // This handler is the ONLY place in the codebase (besides scripts/create-admin.mjs,
 // which runs locally on a developer's machine) that touches SUPABASE_SECRET_KEY. It
 // must only ever run server-side (Vite dev middleware, or a Vercel serverless
-// function) — never import this from src/ code that ships to the browser.
+// function) â€” never import this from src/ code that ships to the browser.
 const getServiceClient = () => {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
@@ -18,6 +18,8 @@ const NewTeamMemberSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters.'),
   role: z.enum(['ADMIN', 'USER']),
 });
+
+const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'OPERATIONS']);
 
 export interface AdminActionResult {
   statusCode: number;
@@ -57,8 +59,8 @@ export async function handleCreateTeamMember(
     return { statusCode: 401, headers: ADMIN_CORS_HEADERS, body: { ok: false, error: 'UNAUTHORIZED', message: 'Invalid or expired session.' } };
   }
 
-  const { data: callerProfile } = await supabase.from('profiles').select('role').eq('id', callerData.user.id).maybeSingle();
-  if (!callerProfile || callerProfile.role === 'USER') {
+  const { data: callerProfile, error: profileError } = await supabase.from('profiles').select('role').eq('id', callerData.user.id).maybeSingle();
+  if (profileError || !callerProfile || !ADMIN_ROLES.has(String(callerProfile.role))) {
     return { statusCode: 403, headers: ADMIN_CORS_HEADERS, body: { ok: false, error: 'FORBIDDEN', message: 'Only existing admins can add team members.' } };
   }
 
@@ -105,3 +107,4 @@ export async function handleCreateTeamMember(
     body: { ok: true, profile: { id: created.user.id, email, full_name: fullName, role } },
   };
 }
+

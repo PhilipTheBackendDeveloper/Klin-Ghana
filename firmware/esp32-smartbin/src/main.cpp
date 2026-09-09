@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SmartBin Intelligence / KlinGhana - SB-024 Core Microcontroller Firmware
  * Target MCU: ESP32-WROOM-32 Dev Module
  *
@@ -31,6 +31,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <TinyGPSPlus.h>
+#include <Preferences.h>
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -77,7 +78,9 @@ const unsigned long GPS_LOG_INTERVAL_MS = 6000;
 TinyGPSPlus gps;
 HardwareSerial gpsSerial(2);
 WiFiClientSecure mqttSecureClient;
+WiFiClientSecure httpSecureClient;
 PubSubClient mqttClient(mqttSecureClient);
+Preferences telemetryPrefs;
 
 unsigned long lastSensorMs = 0;
 unsigned long lastTelemetryMs = 0;
@@ -86,7 +89,17 @@ unsigned long wifiBackoffMs = 1000;
 unsigned long lastMqttAttemptMs = 0;
 unsigned long lastGpsLogMs = 0;
 uint32_t telemetrySequence = 0;
-bool wifiWasConnected = false;
+enum WifiLinkState {
+  WIFI_LINK_DISCONNECTED,
+  WIFI_LINK_CONNECTING,
+  WIFI_LINK_CONNECTED,
+  WIFI_LINK_BACKOFF
+};
+
+WifiLinkState wifiLinkState = WIFI_LINK_DISCONNECTED;
+unsigned long wifiConnectStartedMs = 0;
+const unsigned long WIFI_CONNECT_TIMEOUT_MS = 15000;
+unsigned long lastGpsCharsProcessed = 0;
 
 float rawDistanceCm = EMPTY_DISTANCE_CM;
 float filteredDistanceCm = EMPTY_DISTANCE_CM;
@@ -172,34 +185,52 @@ bool mqttConfigured() {
 #endif
 }
 
+void startWifiConnection() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  wifiConnectStartedMs = millis();
+  lastWifiAttemptMs = millis();
+  wifiLinkState = WIFI_LINK_CONNECTING;
+  Serial.printf("[WIFI] CONNECTING backoff=%lu ms\n", wifiBackoffMs);
+}
+
 void maintainWifi() {
   const wl_status_t status = WiFi.status();
 
   if (status == WL_CONNECTED) {
-    if (!wifiWasConnected) {
-      wifiWasConnected = true;
+    if (wifiLinkState != WIFI_LINK_CONNECTED) {
+      wifiLinkState = WIFI_LINK_CONNECTED;
       digitalWrite(PIN_LED, HIGH);
       wifiBackoffMs = 1000;
-      Serial.println("[WIFI] connected");
-      Serial.printf("[WIFI] IP=%s RSSI=%d dBm\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+      Serial.printf("[WIFI] connected RSSI=%d dBm IP=%s\n", WiFi.RSSI(), WiFi.localIP().toString().c_str());
     }
     return;
   }
 
-  if (wifiWasConnected) {
-    wifiWasConnected = false;
-    Serial.println("[WIFI] Connection lost. Reconnecting...");
+  digitalWrite(PIN_LED, (millis() / 300) % 2);
+
+  if (wifiLinkState == WIFI_LINK_CONNECTED) {
+    wifiLinkState = WIFI_LINK_BACKOFF;
+    lastWifiAttemptMs = millis();
+    WiFi.disconnect(false);
+    Serial.println("[WIFI] disconnected; entering BACKOFF");
+    return;
   }
 
-  digitalWrite(PIN_LED, (millis() / 300) % 2);
-  if (millis() - lastWifiAttemptMs < wifiBackoffMs) return;
+  if (wifiLinkState == WIFI_LINK_CONNECTING) {
+    if (millis() - wifiConnectStartedMs < WIFI_CONNECT_TIMEOUT_MS) return;
+    WiFi.disconnect(false);
+    wifiLinkState = WIFI_LINK_BACKOFF;
+    Serial.printf("[WIFI] connect timeout; BACKOFF %lu ms\n", wifiBackoffMs);
+    return;
+  }
 
-  lastWifiAttemptMs = millis();
-  Serial.printf("[WIFI] connecting to SSID: %s (backoff: %lu ms)\n", WIFI_SSID, wifiBackoffMs);
-  WiFi.disconnect(false);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  wifiBackoffMs = min(wifiBackoffMs * 2, WIFI_BACKOFF_MAX_MS);
+  if (wifiLinkState == WIFI_LINK_BACKOFF) {
+    if (millis() - lastWifiAttemptMs < wifiBackoffMs) return;
+    wifiBackoffMs = min(wifiBackoffMs * 2, WIFI_BACKOFF_MAX_MS);
+  }
+
+  startWifiConnection();
 }
 
 void maintainMqtt() {
@@ -235,6 +266,7 @@ void maintainMqtt() {
 
 String buildTelemetryJson() {
   telemetrySequence++;
+  telemetryPrefs.putUInt("seq", telemetrySequence);
 
   StaticJsonDocument<768> doc;
   doc["schemaVersion"] = 1;
@@ -290,7 +322,12 @@ bool publishHttpTelemetry(const String& payload) {
 
   HTTPClient http;
   const String endpoint = getTelemetryEndpoint();
-  http.begin(endpoint);
+  if (endpoint.startsWith("https://")) {
+    httpSecureClient.setInsecure();
+    http.begin(httpSecureClient, endpoint);
+  } else {
+    http.begin(endpoint);
+  }
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Id", DEVICE_ID);
   http.addHeader("X-Device-Key", DEVICE_KEY);
@@ -298,14 +335,20 @@ bool publishHttpTelemetry(const String& payload) {
   Serial.println("[HTTP] Transmitting telemetry to hosted web application...");
   const int httpCode = http.POST(payload);
 
+  const String responseBody = http.getString();
   if (httpCode >= 200 && httpCode < 300) {
-    Serial.printf("[HTTP] POST telemetry succeeded: HTTP %d\n", httpCode);
+    Serial.printf("[HTTP] %d\n", httpCode);
+    if (responseBody.indexOf("\"accepted\":true") >= 0) {
+      Serial.printf("[TELEMETRY] accepted seq=%lu\n", (unsigned long)telemetrySequence);
+    } else {
+      Serial.println("[ERROR] HTTP 2xx without accepted=true");
+    }
   } else {
     Serial.printf("[ERROR] HTTP POST failed with code %d: %s\n", httpCode, http.errorToString(httpCode).c_str());
   }
 
   http.end();
-  return httpCode >= 200 && httpCode < 300;
+  return httpCode >= 200 && httpCode < 300 && responseBody.indexOf("\"accepted\":true") >= 0;
 }
 
 bool publishMqttTelemetry(const String& payload) {
@@ -341,6 +384,8 @@ void publishTelemetry() {
 void setup() {
   Serial.begin(115200);
   delay(300);
+  telemetryPrefs.begin("klinghana", false);
+  telemetrySequence = telemetryPrefs.getUInt("seq", 0);
 
   // 1. Startup Self-Test Banner
   Serial.println("==================================================");
@@ -378,9 +423,9 @@ void setup() {
   Serial.println("==================================================");
 
   // 6. Wi-Fi Initialization
-  Serial.println("[WIFI] connecting");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.println("[WIFI] DISCONNECTED");
+  wifiLinkState = WIFI_LINK_DISCONNECTED;
+  maintainWifi();
 }
 
 void loop() {
@@ -397,9 +442,12 @@ void loop() {
       Serial.printf("[GPS] FIX OK: Lat=%.6f Lng=%.6f Sats=%d HDOP=%.1f\n",
         gps.location.lat(), gps.location.lng(), gps.satellites.value(), gps.hdop.hdop());
     } else {
-      Serial.printf("[GPS] searching... Sats=%d Chars=%lu\n",
+      const unsigned long charsProcessed = (unsigned long)gps.charsProcessed();
+      Serial.printf("[GPS] Awaiting GPS fix sats=%d charsProcessed=%lu delta=%lu\n",
         gps.satellites.isValid() ? gps.satellites.value() : 0,
-        (unsigned long)gps.charsProcessed());
+        charsProcessed,
+        charsProcessed - lastGpsCharsProcessed);
+      lastGpsCharsProcessed = charsProcessed;
     }
   }
 
@@ -430,3 +478,5 @@ void loop() {
 
   delay(20);
 }
+
+

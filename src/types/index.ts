@@ -1,12 +1,12 @@
-export type UserRole = 'admin' | 'researcher' | 'citizen';
+﻿export type UserRole = 'admin' | 'researcher' | 'citizen';
 
 export type BinStatus = 'normal' | 'warning' | 'critical' | 'overflow' | 'offline';
 
 export type WasteCategory = 'general' | 'plastic' | 'organic' | 'paper' | 'electronic' | 'glass';
 
 export interface GpsLocation {
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   address: string;
   city: string;
   landmark?: string;
@@ -104,5 +104,6 @@ export interface AiChatMessage {
   suggestedAction?: string;
   categoryTag?: WasteCategory;
 }
+
 
 

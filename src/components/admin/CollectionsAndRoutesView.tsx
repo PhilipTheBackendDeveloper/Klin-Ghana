@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { CheckCircle2, Truck } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import { useSmartBin } from '../../context/SmartBinContext';
@@ -14,7 +14,7 @@ export const CollectionsAndRoutesView: React.FC = () => {
     .map((stop) => bins.find((bin) => bin.code === stop.binCode))
     .filter((bin): bin is NonNullable<typeof bin> => Boolean(bin && bin.gpsFix));
   const polylineCoords: [number, number][] = stopBins.map((bin) => [bin.location.lat, bin.location.lng]);
-  const center: [number, number] = polylineCoords[0] || [5.6037, -0.1870];
+  const center: [number, number] = polylineCoords[0] || [0, 0];
 
   const handleCollectStop = (index: number, name: string) => {
     markRouteStopCollected(index);
@@ -106,4 +106,5 @@ export const CollectionsAndRoutesView: React.FC = () => {
     </div>
   );
 };
+
 

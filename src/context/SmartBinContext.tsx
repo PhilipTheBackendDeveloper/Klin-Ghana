@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { SmartBin, UserRole, AlertNotification, CollectionRecord, CitizenReport } from '../types';
 import { IotIngestionService } from '../services/iotIngestion';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
@@ -100,7 +100,7 @@ const getDemoValue = <T,>(key: string, fallback: T): T => {
 
 // The ESP32 reports every ~12s while it's alive (see firmware
 // TELEMETRY_INTERVAL_MS), but a device that has lost power, Wi-Fi, or
-// cloud reachability has no way to tell the server it went dark — it just
+// cloud reachability has no way to tell the server it went dark â€” it just
 // stops sending. `connection_status`/`bin_status` in bin_current_state are
 // therefore whatever the *last accepted packet* said (often still
 // "ONLINE"), and never flip back on their own. Recency is the only
@@ -124,8 +124,8 @@ const uiStatusFromDb = (state: any): SmartBin['status'] => {
 const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
   const state = Array.isArray(row.bin_current_state) ? row.bin_current_state[0] : row.bin_current_state;
   const hasGpsFix = Boolean(state?.gps_fix && state?.latitude != null && state?.longitude != null && Number(state.latitude) !== 0 && Number(state.longitude) !== 0);
-  const latitude = hasGpsFix ? Number(state.latitude) : (row.latitude ? Number(row.latitude) : (state?.latitude ? Number(state.latitude) : 6.6885));
-  const longitude = hasGpsFix ? Number(state.longitude) : (row.longitude ? Number(row.longitude) : (state?.longitude ? Number(state.longitude) : -1.6244));
+  const latitude = hasGpsFix ? Number(state.latitude) : null;
+  const longitude = hasGpsFix ? Number(state.longitude) : null;
   return {
     id: row.id,
     code: row.code,
@@ -135,8 +135,8 @@ const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
     location: {
       lat: latitude,
       lng: longitude,
-      address: hasGpsFix ? (row.address || 'GPS verified location') : (row.address || 'Awaiting GPS lock'),
-      city: row.city || 'Kumasi',
+      address: hasGpsFix ? (row.address || 'GPS verified location') : 'Awaiting GPS fix',
+      city: row.city || '',
       landmark: row.zone || undefined,
     },
     status: uiStatusFromDb(state),
@@ -158,7 +158,7 @@ const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
     telemetryMessageId: state?.message_id || undefined,
     telemetrySequence: state?.last_message_sequence ?? state?.message_sequence ?? undefined,
     assignedZone: row.zone || undefined,
-    notes: !state ? 'No telemetry received' : isBinStale(state) ? 'Device has gone quiet — no telemetry received recently' : undefined,
+    notes: !state ? 'No telemetry received' : isBinStale(state) ? 'Device has gone quiet â€” no telemetry received recently' : undefined,
   } as SmartBin;
 });
 
@@ -350,7 +350,6 @@ export const SmartBinProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         collector_name: collectorName,
         zone: targetBin.assignedZone || 'Unknown',
       });
-      await supabase.from('bin_current_state').update({ fill_percentage: 0, fill_status: 'NORMAL', bin_status: 'NORMAL', updated_at: new Date().toISOString() }).eq('bin_id', targetBin.id);
       await refreshLiveData();
       return;
     }
@@ -498,3 +497,4 @@ export const useSmartBin = () => {
   if (!context) throw new Error('useSmartBin must be used within a SmartBinProvider');
   return context;
 };
+

@@ -1,19 +1,36 @@
-import { createClient } from '@supabase/supabase-js';
+﻿import { createClient } from '@supabase/supabase-js';
 import {
   calculateHardwareFillStatus,
-  isDuplicateTelemetry,
-  isStaleSequence,
   normalizeDeviceId,
   TelemetryPayloadSchema,
 } from '../shared/telemetryContract.ts';
 import { verifyDeviceCredential } from './deviceCredentials.ts';
 
-const seenMessageIds = new Set<string>();
-const lastSequenceByDevice = new Map<string, number>();
+type SupabaseError = { code?: string; message: string };
+type SupabaseResult<T = unknown> = { data: T | null; error: SupabaseError | null };
+
+type SupabaseQuery<T = unknown> = PromiseLike<SupabaseResult<T>> & {
+  select: (columns?: string) => SupabaseQuery<T>;
+  insert: (values: unknown) => SupabaseQuery<T>;
+  update: (values: unknown) => SupabaseQuery<T>;
+  upsert: (values: unknown, options?: unknown) => SupabaseQuery<T>;
+  eq: (column: string, value: unknown) => SupabaseQuery<T>;
+  neq: (column: string, value: unknown) => SupabaseQuery<T>;
+  maybeSingle: () => Promise<SupabaseResult<T>>;
+  limit: (count: number) => SupabaseQuery<T>;
+};
+
+export type SupabaseLike = {
+  from: <T = unknown>(table: string) => SupabaseQuery<T>;
+};
+
+export interface IotHandlerDeps {
+  supabase?: SupabaseLike | null;
+}
 
 const getSupabaseServerClient = () => {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) return null;
   return createClient(url, key, {
     auth: { persistSession: false },
@@ -26,16 +43,33 @@ export interface IngestionResult {
   body: Record<string, unknown>;
 }
 
+const makeCorsHeaders = (): Record<string, string> => ({
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'x-device-id, x-device-key, content-type, apikey, authorization',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+});
+
+const dbFailure = (
+  headers: Record<string, string>,
+  statusCode: number,
+  error: string,
+  message: string,
+  detail?: string
+): IngestionResult => ({
+  statusCode,
+  headers,
+  body: { ok: false, error, message, ...(detail ? { detail } : {}) },
+});
+
+const isNoRows = (error: SupabaseError | null | undefined): boolean => error?.code === 'PGRST116';
+
 export async function handleTelemetryIngestion(
   headers: Record<string, string | string[] | undefined>,
-  rawBody: string | Record<string, unknown>
+  rawBody: string | Record<string, unknown>,
+  deps: IotHandlerDeps = {}
 ): Promise<IngestionResult> {
-  const corsHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'x-device-id, x-device-key, content-type, apikey, authorization',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
+  const corsHeaders = makeCorsHeaders();
 
   const getHeader = (name: string): string => {
     const val = headers[name.toLowerCase()] || headers[name];
@@ -90,115 +124,187 @@ export async function handleTelemetryIngestion(
     };
   }
 
+  const supabase = deps.supabase !== undefined ? deps.supabase : getSupabaseServerClient();
+  if (!supabase) {
+    return dbFailure(
+      corsHeaders,
+      500,
+      'SUPABASE_NOT_CONFIGURED',
+      'Telemetry persistence requires SUPABASE_URL and SUPABASE_SECRET_KEY.'
+    );
+  }
+
   const validData = parseResult.data;
-
-  if (isDuplicateTelemetry(seenMessageIds, deviceId, validData.messageId)) {
-    return {
-      statusCode: 409,
-      headers: corsHeaders,
-      body: { ok: false, error: 'DUPLICATE_MESSAGE', message: 'Telemetry messageId was already accepted.' },
-    };
-  }
-
-  if (isStaleSequence(lastSequenceByDevice, deviceId, validData.sequence)) {
-    return {
-      statusCode: 409,
-      headers: corsHeaders,
-      body: { ok: false, error: 'STALE_SEQUENCE', message: 'Telemetry sequence is not newer than the last accepted packet.' },
-    };
-  }
-
   const evaluatedStatus = calculateHardwareFillStatus(validData.fillPercentage);
   const nowIso = new Date().toISOString();
   const rawDist = validData.rawDistanceCm ?? validData.distanceCm;
-  const sequenceNum = validData.sequence ?? 0;
+  const sequenceNum = validData.sequence;
 
-  // Persist to Supabase if configured
-  const supabase = getSupabaseServerClient();
-  if (supabase) {
-    try {
-      const { data: binRecord } = await supabase
-        .from('bins')
-        .select('id, name')
-        .eq('code', deviceId)
-        .maybeSingle();
+  try {
+    const binLookup = await supabase
+      .from<{ id: string; name: string }>('bins')
+      .select('id, name')
+      .eq('code', deviceId)
+      .maybeSingle();
 
-      if (binRecord) {
-        const commonRow = {
-          bin_id: binRecord.id,
-          device_id: deviceId,
-          fill_percentage: validData.fillPercentage,
-          distance_cm: validData.distanceCm,
-          raw_distance_cm: rawDist,
-          fill_status: evaluatedStatus,
-          lid_state: validData.lidState,
-          battery_percentage: validData.batteryPercentage,
-          temperature_c: validData.temperatureC,
-          wifi_rssi: validData.wifiRssi,
-          latitude: validData.gpsFix ? validData.latitude : null,
-          longitude: validData.gpsFix ? validData.longitude : null,
-          gps_accuracy_m: validData.gpsAccuracyM,
-          gps_fix: validData.gpsFix,
-          gps_updated_at: validData.gpsFix ? (validData.gpsUpdatedAt || nowIso) : null,
-          satellites: validData.satellites,
-          location_source: validData.gpsFix ? 'GPS' : 'UNKNOWN',
-          firmware_version: validData.firmwareVersion,
-          message_id: validData.messageId || null,
-          message_sequence: sequenceNum,
-        };
+    if (binLookup.error) return dbFailure(corsHeaders, 502, 'BIN_LOOKUP_FAILED', 'Could not verify device/bin registration.', binLookup.error.message);
+    if (!binLookup.data) return dbFailure(corsHeaders, 404, 'DEVICE_NOT_REGISTERED', `No bin is registered for ${deviceId}.`);
 
-        await supabase.from('telemetry').insert({
-          ...commonRow,
-          recorded_at: nowIso,
-        });
+    const duplicateLookup = await supabase
+      .from<{ id: string }>('telemetry')
+      .select('id')
+      .eq('device_id', deviceId)
+      .eq('message_id', validData.messageId)
+      .maybeSingle();
 
-        await supabase.from('bin_current_state').upsert({
-          ...commonRow,
-          bin_status: evaluatedStatus,
-          connection_status: 'ONLINE',
-          last_seen_at: nowIso,
-          telemetry_received_at: nowIso,
-          updated_at: nowIso,
-          last_message_sequence: sequenceNum,
-        });
-
-        await supabase
-          .from('devices')
-          .update({ last_heartbeat: nowIso, firmware_version: validData.firmwareVersion })
-          .eq('device_id', deviceId);
-
-        // Alert Evaluation
-        if (validData.fillPercentage >= 95) {
-          const alertType = validData.fillPercentage >= 100 ? 'OVERFLOW' : 'FULL';
-          const { data: existingAlert } = await supabase
-            .from('alerts')
-            .select('id')
-            .eq('bin_id', binRecord.id)
-            .eq('alert_type', alertType)
-            .eq('status', 'OPEN')
-            .maybeSingle();
-
-          if (!existingAlert) {
-            await supabase.from('alerts').insert({
-              bin_id: binRecord.id,
-              alert_type: alertType,
-              severity: 'CRITICAL',
-              status: 'OPEN',
-              message: `${alertType === 'OVERFLOW' ? 'Bin overflow detected' : 'Bin reached full threshold'} at ${validData.fillPercentage.toFixed(1)}% (${binRecord.name})`,
-              created_at: nowIso,
-            });
-          }
-        } else if (validData.fillPercentage < 85) {
-          await supabase
-            .from('alerts')
-            .update({ status: 'RESOLVED', resolved_at: nowIso })
-            .eq('bin_id', binRecord.id)
-            .eq('status', 'OPEN');
-        }
-      }
-    } catch {
-      // Ingestion falls back gracefully if database operation encounters temporary network pause
+    if (duplicateLookup.error && !isNoRows(duplicateLookup.error)) {
+      return dbFailure(corsHeaders, 502, 'DUPLICATE_LOOKUP_FAILED', 'Could not verify telemetry messageId uniqueness.', duplicateLookup.error.message);
     }
+    if (duplicateLookup.data) {
+      return {
+        statusCode: 409,
+        headers: corsHeaders,
+        body: { ok: false, error: 'DUPLICATE_MESSAGE', message: 'Telemetry messageId was already accepted.' },
+      };
+    }
+
+    const stateLookup = await supabase
+      .from<{ last_message_sequence?: number | null; message_sequence?: number | null }>('bin_current_state')
+      .select('last_message_sequence, message_sequence')
+      .eq('device_id', deviceId)
+      .maybeSingle();
+
+    if (stateLookup.error && !isNoRows(stateLookup.error)) {
+      return dbFailure(corsHeaders, 502, 'STATE_LOOKUP_FAILED', 'Could not read current device sequence.', stateLookup.error.message);
+    }
+
+    const lastSequence = Number(stateLookup.data?.last_message_sequence ?? stateLookup.data?.message_sequence ?? -1);
+    if (Number.isFinite(lastSequence) && sequenceNum <= lastSequence) {
+      return {
+        statusCode: 409,
+        headers: corsHeaders,
+        body: { ok: false, error: 'STALE_SEQUENCE', message: 'Telemetry sequence is not newer than the durable database state.' },
+      };
+    }
+
+    const hasGpsFix = Boolean(
+      validData.gpsFix &&
+      typeof validData.latitude === 'number' &&
+      typeof validData.longitude === 'number' &&
+      Number.isFinite(validData.latitude) &&
+      Number.isFinite(validData.longitude) &&
+      validData.latitude !== 0 &&
+      validData.longitude !== 0
+    );
+
+    const commonRow = {
+      bin_id: binLookup.data.id,
+      device_id: deviceId,
+      fill_percentage: validData.fillPercentage,
+      distance_cm: validData.distanceCm,
+      raw_distance_cm: rawDist,
+      fill_status: evaluatedStatus,
+      lid_state: validData.lidState,
+      battery_percentage: validData.batteryPercentage,
+      temperature_c: validData.temperatureC,
+      wifi_rssi: validData.wifiRssi,
+      latitude: hasGpsFix ? validData.latitude : null,
+      longitude: hasGpsFix ? validData.longitude : null,
+      gps_accuracy_m: hasGpsFix ? validData.gpsAccuracyM : null,
+      gps_fix: hasGpsFix,
+      gps_updated_at: hasGpsFix ? (validData.gpsUpdatedAt || nowIso) : null,
+      satellites: validData.satellites,
+      location_source: hasGpsFix ? 'GPS' : 'UNKNOWN',
+      firmware_version: validData.firmwareVersion,
+      message_id: validData.messageId,
+      message_sequence: sequenceNum,
+    };
+
+    const telemetryInsert = await supabase.from('telemetry').insert({
+      ...commonRow,
+      recorded_at: nowIso,
+    });
+
+    if (telemetryInsert.error) {
+      const isDuplicate = telemetryInsert.error.code === '23505';
+      return dbFailure(
+        corsHeaders,
+        isDuplicate ? 409 : 502,
+        isDuplicate ? 'DUPLICATE_MESSAGE' : 'TELEMETRY_INSERT_FAILED',
+        isDuplicate ? 'Telemetry messageId was already accepted.' : 'Could not persist telemetry row.',
+        telemetryInsert.error.message
+      );
+    }
+
+    const currentStateUpsert = await supabase.from('bin_current_state').upsert({
+      ...commonRow,
+      bin_status: evaluatedStatus,
+      connection_status: 'ONLINE',
+      last_seen_at: nowIso,
+      telemetry_received_at: nowIso,
+      updated_at: nowIso,
+      last_message_sequence: sequenceNum,
+    }, { onConflict: 'bin_id' });
+
+    if (currentStateUpsert.error) {
+      return dbFailure(corsHeaders, 502, 'CURRENT_STATE_UPSERT_FAILED', 'Could not persist bin_current_state row.', currentStateUpsert.error.message);
+    }
+
+    const heartbeatUpsert = await supabase.from('devices').upsert({
+      device_id: deviceId,
+      bin_id: binLookup.data.id,
+      firmware_version: validData.firmwareVersion,
+      is_active: true,
+      last_heartbeat: nowIso,
+    }, { onConflict: 'device_id' });
+
+    if (heartbeatUpsert.error) {
+      return dbFailure(corsHeaders, 502, 'DEVICE_HEARTBEAT_FAILED', 'Could not persist device heartbeat.', heartbeatUpsert.error.message);
+    }
+
+    const fillAlertTypes = ['NEAR_FULL', 'FULL', 'OVERFLOW'];
+    if (fillAlertTypes.includes(evaluatedStatus)) {
+      const closeOtherAlerts = await supabase
+        .from('alerts')
+        .update({ status: 'RESOLVED', resolved_at: nowIso, updated_at: nowIso })
+        .eq('bin_id', binLookup.data.id)
+        .neq('alert_type', evaluatedStatus)
+        .eq('status', 'OPEN');
+      if (closeOtherAlerts.error) return dbFailure(corsHeaders, 502, 'ALERT_UPDATE_FAILED', 'Could not resolve superseded fill alerts.', closeOtherAlerts.error.message);
+
+      const existingAlert = await supabase
+        .from<{ id: string }>('alerts')
+        .select('id')
+        .eq('bin_id', binLookup.data.id)
+        .eq('alert_type', evaluatedStatus)
+        .eq('status', 'OPEN')
+        .maybeSingle();
+      if (existingAlert.error && !isNoRows(existingAlert.error)) {
+        return dbFailure(corsHeaders, 502, 'ALERT_LOOKUP_FAILED', 'Could not inspect active fill alerts.', existingAlert.error.message);
+      }
+
+      if (!existingAlert.data) {
+        const alertInsert = await supabase.from('alerts').insert({
+          bin_id: binLookup.data.id,
+          alert_type: evaluatedStatus,
+          severity: evaluatedStatus === 'NEAR_FULL' ? 'WARNING' : 'CRITICAL',
+          status: 'OPEN',
+          message: `${evaluatedStatus.replace('_', ' ')} fill state at ${validData.fillPercentage.toFixed(1)}% (${binLookup.data.name})`,
+          created_at: nowIso,
+          updated_at: nowIso,
+        });
+        if (alertInsert.error) return dbFailure(corsHeaders, 502, 'ALERT_INSERT_FAILED', 'Could not persist fill alert.', alertInsert.error.message);
+      }
+    } else {
+      const resolveAlerts = await supabase
+        .from('alerts')
+        .update({ status: 'RESOLVED', resolved_at: nowIso, updated_at: nowIso })
+        .eq('bin_id', binLookup.data.id)
+        .eq('status', 'OPEN');
+      if (resolveAlerts.error) return dbFailure(corsHeaders, 502, 'ALERT_RESOLVE_FAILED', 'Could not resolve open alerts after normal fill telemetry.', resolveAlerts.error.message);
+    }
+  } catch (err) {
+    return dbFailure(corsHeaders, 500, 'INTERNAL_ERROR', err instanceof Error ? err.message : 'Unexpected telemetry ingestion failure.');
   }
 
   return {
@@ -214,7 +320,7 @@ export async function handleTelemetryIngestion(
       fillPercentage: validData.fillPercentage,
       distanceCm: validData.distanceCm,
       rawDistanceCm: rawDist,
-      gpsFix: validData.gpsFix,
+      gpsFix: Boolean(validData.gpsFix),
       evaluatedStatus,
     },
   };
@@ -227,7 +333,7 @@ export async function handleHealthCheck(): Promise<IngestionResult> {
   };
 
   const supabase = getSupabaseServerClient();
-  let dbStatus = 'disconnected';
+  let dbStatus = 'unconfigured';
 
   if (supabase) {
     try {
@@ -244,7 +350,11 @@ export async function handleHealthCheck(): Promise<IngestionResult> {
     body: {
       status: 'ok',
       database: dbStatus,
+      requires: ['SUPABASE_SECRET_KEY'],
       timestamp: new Date().toISOString(),
     },
   };
 }
+
+
+
