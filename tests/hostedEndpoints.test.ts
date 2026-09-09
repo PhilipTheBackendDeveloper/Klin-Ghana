@@ -104,4 +104,47 @@ describe('Hosted Endpoint Specification Suite (/api/health and /api/iot/telemetr
     expect(body.ok).toBe(false);
     expect(body.error).toBe('DEVICE_MISMATCH');
   });
+
+  it('POST /api/iot/telemetry returns 500 and accepted: false if database fails to persist state', async () => {
+    const { handleTelemetryIngestion } = await import('../src/server/iotHandler');
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === 'bins') {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { id: 'bin-123', name: 'Test Bin', latitude: 6.0, longitude: -1.0 } }),
+              }),
+            }),
+          };
+        }
+        if (table === 'telemetry') {
+          return { insert: async () => ({ error: null }) };
+        }
+        if (table === 'bin_current_state') {
+          return { upsert: async () => ({ error: { message: 'Could not find column in schema cache' } }) };
+        }
+        return { upsert: async () => ({ error: null }), update: async () => ({ error: null }) };
+      },
+    };
+
+    const res = await handleTelemetryIngestion(
+      { 'x-device-id': 'SB-024', 'x-device-key': 'klinghana_dev_device_key_sb024' },
+      JSON.stringify({
+        schemaVersion: 1,
+        messageId: `SB-024-err-${Date.now()}`,
+        sequence: 9999,
+        deviceId: 'SB-024',
+        timestamp: Date.now(),
+        fillPercentage: 50,
+        distanceCm: 50,
+      }),
+      { supabase: mockSupabase as any }
+    );
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body.accepted).toBe(false);
+    expect(res.body.error).toBe('DATABASE_ERROR');
+  });
 });
+

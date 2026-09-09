@@ -189,10 +189,24 @@ export async function handleTelemetryIngestion(
           message_sequence: sequenceNum,
         };
 
-        await supabase.from('telemetry').insert({
+        const { error: telemetryError } = await supabase.from('telemetry').insert({
           ...commonRow,
           recorded_at: nowIso,
         });
+        if (telemetryError) {
+          console.error('[TELEMETRY] telemetry insert error:', telemetryError);
+          return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: {
+              ok: false,
+              success: false,
+              accepted: false,
+              error: 'DATABASE_ERROR',
+              message: `Failed to insert telemetry: ${telemetryError.message}`,
+            },
+          };
+        }
 
         const { error: stateError } = await supabase.from('bin_current_state').upsert({
           ...commonRow,
@@ -204,6 +218,17 @@ export async function handleTelemetryIngestion(
         }, { onConflict: 'bin_id' });
         if (stateError) {
           console.error('[TELEMETRY] bin_current_state upsert error:', stateError);
+          return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: {
+              ok: false,
+              success: false,
+              accepted: false,
+              error: 'DATABASE_ERROR',
+              message: `Failed to persist bin current state: ${stateError.message}`,
+            },
+          };
         }
 
         if (hasGpsFix) {

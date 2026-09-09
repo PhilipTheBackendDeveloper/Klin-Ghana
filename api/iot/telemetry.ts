@@ -211,7 +211,18 @@ export default async function handler(req: any, res?: any) {
             message_sequence: data.sequence,
           };
 
-          await supabase.from('telemetry').insert({ ...common, recorded_at: nowIso });
+          const { error: telemetryError } = await supabase.from('telemetry').insert({ ...common, recorded_at: nowIso });
+          if (telemetryError) {
+            console.error('[TELEMETRY] telemetry insert error:', telemetryError);
+            return sendResponse(500, {
+              ok: false,
+              success: false,
+              accepted: false,
+              error: 'DATABASE_ERROR',
+              message: `Failed to insert telemetry: ${telemetryError.message}`,
+            });
+          }
+
           const { error: stateError } = await supabase.from('bin_current_state').upsert({
             ...common,
             bin_status: evaluatedStatus,
@@ -222,6 +233,13 @@ export default async function handler(req: any, res?: any) {
           }, { onConflict: 'bin_id' });
           if (stateError) {
             console.error('[TELEMETRY] bin_current_state upsert error:', stateError);
+            return sendResponse(500, {
+              ok: false,
+              success: false,
+              accepted: false,
+              error: 'DATABASE_ERROR',
+              message: `Failed to persist bin current state: ${stateError.message}`,
+            });
           }
 
           if (hasGpsData) {
@@ -258,8 +276,15 @@ export default async function handler(req: any, res?: any) {
             await supabase.from('alerts').update({ status: 'RESOLVED', resolved_at: nowIso }).eq('bin_id', bin.id).eq('status', 'OPEN');
           }
         }
-      } catch (e) {
-        console.warn('[TELEMETRY] Supabase non-fatal persistence warning:', e);
+      } catch (e: any) {
+        console.error('[TELEMETRY] Supabase persistence error:', e);
+        return sendResponse(500, {
+          ok: false,
+          success: false,
+          accepted: false,
+          error: 'DATABASE_ERROR',
+          message: e?.message || 'Database persistence error',
+        });
       }
     }
 
