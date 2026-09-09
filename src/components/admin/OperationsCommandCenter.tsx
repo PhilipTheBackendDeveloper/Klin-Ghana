@@ -346,13 +346,14 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
                 attribution={currentLayer.attribution}
                 url={currentLayer.url}
                 maxZoom={currentLayer.maxZoom}
-                subdomains={currentLayer.subdomains}
+                subdomains={currentLayer.subdomains || ['a', 'b', 'c']}
               />
               {currentLayer.labelsUrl && (
                 <TileLayer
                   key={`${mapStyle}-labels`}
                   url={currentLayer.labelsUrl}
                   maxZoom={currentLayer.labelsMaxZoom ?? currentLayer.maxZoom}
+                  subdomains={currentLayer.subdomains || ['a', 'b', 'c']}
                 />
               )}
               <MapAutoSize />

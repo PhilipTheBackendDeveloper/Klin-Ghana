@@ -19,9 +19,10 @@ export const MAP_LAYERS: Record<MapStyle, MapLayerConfig> = {
     id: 'satellite',
     label: 'Satellite (Buildings)',
     // Google Hybrid: High-resolution satellite imagery + building footprints + road overlays
-    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
     attribution: 'Imagery &copy; Google Maps',
     maxZoom: 20,
+    subdomains: ['0', '1', '2', '3'],
   },
   street: {
     id: 'street',
@@ -39,6 +40,7 @@ export const MAP_LAYERS: Record<MapStyle, MapLayerConfig> = {
     attribution: 'Tiles &copy; Esri',
     maxZoom: 16,
     labelsMaxZoom: 13,
+    subdomains: ['server', 'services'],
   },
 };
 
