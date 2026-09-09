@@ -4,6 +4,7 @@ import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { handleHealthCheck, handleTelemetryIngestion } from './src/server/iotHandler.ts';
 import { handleCreateTeamMember, ADMIN_CORS_HEADERS } from './src/server/adminHandler.ts';
+import { handleAiAssistantChat, AI_ASSISTANT_CORS_HEADERS } from './src/server/aiAssistantHandler.ts';
 
 // `import.meta.env` (populated from .env.local for the browser bundle) is
 // separate from this config/plugin file's own `process.env` — Vite does not
@@ -81,6 +82,25 @@ function iotApiPlugin(): Plugin {
             req.on('data', (chunk) => { body += chunk; });
             req.on('end', async () => {
               const result = await handleCreateTeamMember(req.headers as Record<string, string>, body);
+              res.writeHead(result.statusCode, result.headers);
+              res.end(JSON.stringify(result.body));
+            });
+            return;
+          }
+        }
+
+        if (url === '/api/ai/assistant') {
+          if (req.method === 'OPTIONS') {
+            res.writeHead(200, AI_ASSISTANT_CORS_HEADERS);
+            res.end();
+            return;
+          }
+
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk) => { body += chunk; });
+            req.on('end', async () => {
+              const result = await handleAiAssistantChat(req.headers as Record<string, string>, body);
               res.writeHead(result.statusCode, result.headers);
               res.end(JSON.stringify(result.body));
             });
