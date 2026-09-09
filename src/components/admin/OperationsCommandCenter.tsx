@@ -1,21 +1,45 @@
 import React from 'react';
-import { RefreshCw, CheckCircle2, AlertTriangle, Route, Trash2, ArrowUpRight, Activity, MapPin, HeartPulse, WifiOff, ShieldAlert } from 'lucide-react';
+import {
+  RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
+  Route,
+  Trash2,
+  ArrowUpRight,
+  Activity,
+  MapPin,
+  HeartPulse,
+  WifiOff,
+  ShieldAlert,
+  Crosshair,
+  ExternalLink,
+  Copy,
+  Check,
+  Layers,
+  Building2,
+} from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { SmartBin } from '../../types';
 import { useSmartBin } from '../../context/SmartBinContext';
-import { MAP_TILE_URL, MAP_LABELS_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_MAX_ZOOM, MAP_LABELS_MAX_ZOOM, createBinMarkerIcon } from '../map/mapTiles';
+import {
+  MapStyle,
+  MAP_LAYERS,
+  getMapLayer,
+  createBinMarkerIcon,
+} from '../map/mapTiles';
 import { MapAutoSize } from '../map/MapAutoSize';
 import { StatCard } from '../common/StatCard';
 import { EmptyState } from '../common/EmptyState';
 import { BinLocationLabel } from '../common/BinLocationLabel';
+import { formatCoordinates, getGoogleMapsUrl, useExactLocation } from '../../services/reverseGeocode';
 
-const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
+const MapRecenter: React.FC<{ center: [number, number]; zoom?: number; trigger?: number }> = ({ center, zoom = 18, trigger }) => {
   const map = useMap();
   React.useEffect(() => {
     if (center && Number.isFinite(center[0]) && Number.isFinite(center[1]) && center[0] !== 0 && center[1] !== 0) {
-      map.setView(center, map.getZoom(), { animate: true });
+      map.flyTo(center, zoom, { duration: 1.2 });
     }
-  }, [center, map]);
+  }, [center, zoom, trigger, map]);
   return null;
 };
 
@@ -50,10 +74,33 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
     refreshLiveData,
   } = useSmartBin();
 
+  const [mapStyle, setMapStyle] = React.useState<MapStyle>('satellite');
+  const [focusTrigger, setFocusTrigger] = React.useState(0);
+  const [copiedCoords, setCopiedCoords] = React.useState(false);
+
   const targetBin = selectedBin;
-  const mapBins = bins.slice(0, 8);
+  const mapBins = bins.slice(0, 12);
   const gpsBins = mapBins.filter((b) => Number.isFinite(b.location.lat) && Number.isFinite(b.location.lng) && b.location.lat !== 0 && b.location.lng !== 0);
-  const mapCenter: [number, number] = gpsBins[0] ? [gpsBins[0].location.lat, gpsBins[0].location.lng] : [6.6885, -1.6244];
+
+  // Focus priority: Explicitly selected bin -> First live GPS bin -> default
+  const activePinBin = (targetBin && Number.isFinite(targetBin.location.lat) && targetBin.location.lat !== 0)
+    ? targetBin
+    : (gpsBins[0] || bins[0]);
+
+  const mapCenter: [number, number] = activePinBin && Number.isFinite(activePinBin.location.lat) && activePinBin.location.lat !== 0
+    ? [activePinBin.location.lat, activePinBin.location.lng]
+    : [6.671651, -1.562522];
+
+  const initialZoom = activePinBin?.gpsFix ? 18 : 14;
+  const currentLayer = getMapLayer(mapStyle);
+
+  const exactLocation = useExactLocation(
+    activePinBin?.location?.lat,
+    activePinBin?.location?.lng,
+    activePinBin?.location?.address,
+    activePinBin?.location?.landmark
+  );
+
   const shownReports = citizenReports.filter((report) => report.status !== 'Resolved' && report.status !== 'Closed').slice(0, 4);
   const shownAlerts = alerts.filter((alert) => !alert.read).slice(0, 3);
   const collectedStops = routeStops.filter((stop) => stop.status === 'COLLECTED').length;
@@ -61,6 +108,19 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
   const selectBin = (bin: SmartBin) => {
     setSelectedBinId(bin.id);
     onSelectBin(bin);
+    setFocusTrigger((prev) => prev + 1);
+  };
+
+  const handleFocusBuilding = () => {
+    setFocusTrigger((prev) => prev + 1);
+  };
+
+  const handleCopyCoordinates = () => {
+    if (exactLocation.formattedCoordinates && navigator.clipboard) {
+      navigator.clipboard.writeText(exactLocation.formattedCoordinates);
+      setCopiedCoords(true);
+      setTimeout(() => setCopiedCoords(false), 2000);
+    }
   };
 
   const kpis = [
@@ -95,13 +155,7 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
             <span>{dataMode === 'demo' ? 'Demo data' : dataStatus}</span>
           </button>
 
-          {/* GPS Sync Badge — bins only ever get a new fix by pushing telemetry
-              themselves (there's no remote "request location" channel to the
-              hardware yet), so this re-pulls the latest stored fix from the
-              database rather than pretending to reach out to the device. A
-              live Supabase subscription already refreshes this automatically
-              the moment new telemetry lands; this is the manual "just in
-              case" affordance, same action as the status badge beside it. */}
+          {/* GPS Sync Badge */}
           <button
             type="button"
             onClick={refreshLiveData}
@@ -145,28 +199,165 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
         ))}
       </div>
 
+      {/* Prominent Exact Physical Location Banner */}
+      <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-5 sm:p-6 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                Exact Physical Location
+              </span>
+              {activePinBin?.gpsFix && (
+                <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/25 text-blue-300 border border-blue-500/40">
+                  🛰️ Confirmed Satellite Fix
+                </span>
+              )}
+              {activePinBin && (
+                <span className="text-xs font-mono text-slate-300 bg-white/10 px-2.5 py-0.5 rounded-full border border-white/10">
+                  Asset: <span className="text-white font-bold">{activePinBin.code}</span> ({activePinBin.name})
+                </span>
+              )}
+            </div>
+
+            <div className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
+              <MapPin className="w-6 h-6 text-rose-400 shrink-0 animate-bounce" />
+              <span>{exactLocation.primaryTitle}</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-300">
+              <span className="font-semibold text-slate-200">{exactLocation.suburb}</span>
+              <span>•</span>
+              <span className="text-slate-400">{exactLocation.district}</span>
+              <span>•</span>
+              <span className="text-slate-400">{exactLocation.region}</span>
+              <span>•</span>
+              <span className="font-mono text-cyan-300 font-bold bg-cyan-950/80 px-2.5 py-1 rounded-lg border border-cyan-700/60 shadow-inner">
+                {exactLocation.formattedCoordinates}
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Action Controls on Header */}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleFocusBuilding}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md active:scale-95 border border-blue-400/30"
+              title="Zoom directly into the building rooftop (Level 18x)"
+            >
+              <Crosshair className="w-4 h-4" />
+              <span>Focus Building (18x)</span>
+            </button>
+
+            {exactLocation.isGpsLock && (
+              <a
+                href={exactLocation.googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all shadow-sm active:scale-95"
+                title="Open exact pin in Google Maps"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Google Maps</span>
+              </a>
+            )}
+
+            {exactLocation.isGpsLock && (
+              <button
+                type="button"
+                onClick={handleCopyCoordinates}
+                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all active:scale-95"
+                title="Copy GPS coordinates"
+              >
+                {copiedCoords ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedCoords ? 'Copied' : 'Copy'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Middle Section: Live Fleet Map + Selected Asset Telemetry */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Map Container */}
         <div className="lg:col-span-8 flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
-              <h2 className="font-['Outfit',sans-serif] text-base sm:text-lg font-bold text-slate-900">
-                Kumasi SmartBin Fleet Mesh
+              <h2 className="font-['Outfit',sans-serif] text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                <span>Kumasi SmartBin Fleet Mesh</span>
+                <span className="text-xs font-normal text-slate-400">• High-Res Satellite Buildings</span>
               </h2>
-              <p className="text-[11px] text-slate-500">Live GPS tracking & sensor telemetry overlay</p>
+              <p className="text-[11px] text-slate-500">Live GPS tracking, real compound outlines & sensor telemetry overlay</p>
             </div>
-            <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 font-mono text-xs font-bold text-emerald-700">
-              {bins.length} Assets Active
-            </span>
+
+            {/* Map Layer Switcher Pills */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/80 shrink-0">
+              <button
+                type="button"
+                onClick={() => setMapStyle('satellite')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  mapStyle === 'satellite'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Satellite view showing buildings, compounds, and roofs"
+              >
+                🛰️ Satellite
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapStyle('street')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  mapStyle === 'street'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="OpenStreetMap street view"
+              >
+                🗺️ Street
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapStyle('canvas')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  mapStyle === 'canvas'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Monochrome clean canvas"
+              >
+                ⚪ Canvas
+              </button>
+            </div>
           </div>
 
-          <div className="relative mt-3 h-[320px] sm:h-[380px] w-full overflow-hidden rounded-2xl border border-slate-200 shadow-inner">
-            <MapContainer center={mapCenter} zoom={13} maxZoom={MAP_MAX_ZOOM} scrollWheelZoom={false} className="h-full w-full">
-              <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} maxZoom={MAP_MAX_ZOOM} />
-              <TileLayer url={MAP_LABELS_TILE_URL} maxZoom={MAP_LABELS_MAX_ZOOM} />
+          <div className="relative mt-3 h-[420px] sm:h-[480px] w-full overflow-hidden rounded-2xl border border-slate-200 shadow-inner">
+            <MapContainer
+              center={mapCenter}
+              zoom={initialZoom}
+              maxZoom={currentLayer.maxZoom}
+              scrollWheelZoom={true}
+              className="h-full w-full"
+            >
+              <TileLayer
+                key={mapStyle}
+                attribution={currentLayer.attribution}
+                url={currentLayer.url}
+                maxZoom={currentLayer.maxZoom}
+                subdomains={currentLayer.subdomains}
+              />
+              {currentLayer.labelsUrl && (
+                <TileLayer
+                  key={`${mapStyle}-labels`}
+                  url={currentLayer.labelsUrl}
+                  maxZoom={currentLayer.labelsMaxZoom ?? currentLayer.maxZoom}
+                />
+              )}
               <MapAutoSize />
-              {gpsBins[0] && <MapRecenter center={[gpsBins[0].location.lat, gpsBins[0].location.lng]} />}
+              <MapRecenter center={mapCenter} zoom={18} trigger={focusTrigger} />
+
               {gpsBins.map((bin) => (
                 <Marker
                   key={bin.id}
@@ -175,19 +366,66 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
                   eventHandlers={{ click: () => selectBin(bin) }}
                 >
                   <Popup>
-                    <div className="p-1 text-xs">
-                      <strong>{bin.code} - {bin.name}</strong>
-                      <div className="mt-1 font-bold text-emerald-600">Fill: {bin.currentFillLevel}%</div>
-                      <div>Location: {bin.location.address || bin.location.city}</div>
-                      <div className="text-[10px] text-slate-500 mt-1">{bin.gpsFix ? 'Confirmed Satellite Lock' : 'Bench Location'}</div>
-                      <button onClick={() => selectBin(bin)} className="mt-2 w-full rounded bg-blue-600 py-1 text-[10px] font-bold text-white">
-                        Inspect Telemetry
-                      </button>
+                    <div className="p-2 text-xs min-w-[200px]">
+                      <div className="font-bold text-slate-900 text-sm">{bin.code} - {bin.name}</div>
+                      <div className="text-[11px] font-semibold text-blue-600 mt-0.5">
+                        📍 {bin.location.address || 'Kotei Road, Kumasi'}
+                      </div>
+                      <div className="mt-1 font-mono text-[10px] text-slate-500 bg-slate-100 p-1 rounded">
+                        {formatCoordinates(bin.location.lat, bin.location.lng)}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Fill level:</span>
+                        <span className="font-bold text-emerald-600">{bin.currentFillLevel}%</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs mt-0.5">
+                        <span className="text-slate-500">Battery:</span>
+                        <span className="font-bold text-slate-700">{bin.batteryLevel ?? 'N/A'}%</span>
+                      </div>
+                      <div className="mt-2 text-[10px] font-semibold text-emerald-600">
+                        {bin.gpsFix ? 'Confirmed Satellite Lock' : 'Bench Location'}
+                      </div>
+                      <div className="mt-2 flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => selectBin(bin)}
+                          className="flex-1 rounded bg-blue-600 py-1.5 text-[10px] font-bold text-white hover:bg-blue-700"
+                        >
+                          Select Asset
+                        </button>
+                        <a
+                          href={getGoogleMapsUrl(bin.location.lat, bin.location.lng)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold inline-flex items-center gap-0.5"
+                          title="Open in Google Maps"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
                     </div>
                   </Popup>
                 </Marker>
               ))}
             </MapContainer>
+
+            {/* In-Map Floating Overlay Pill */}
+            <div className="absolute top-3 left-14 z-[400] pointer-events-none hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md text-white border border-white/10 shadow-lg text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{mapStyle === 'satellite' ? 'Google Hybrid Satellite' : mapStyle === 'street' ? 'OpenStreetMap' : 'Light Canvas'}</span>
+              <span className="text-slate-400 font-mono">• Zoom 18x Building View</span>
+            </div>
+
+            {/* In-Map Floating Focus Button */}
+            <button
+              type="button"
+              onClick={handleFocusBuilding}
+              className="absolute bottom-4 right-4 z-[400] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/95 hover:bg-white text-slate-900 text-xs font-bold shadow-lg border border-slate-200 transition-all hover:scale-105 active:scale-95"
+              title="Snap camera to building rooftop"
+            >
+              <Crosshair className="w-3.5 h-3.5 text-blue-600" />
+              <span>Center Building</span>
+            </button>
           </div>
         </div>
 
@@ -219,7 +457,35 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
                   </div>
                 </button>
 
-                <div className="grid grid-cols-2 gap-2 mt-4">
+                {/* Precision GPS Coordinates & Google Maps Link */}
+                {targetBin.location.lat !== 0 && targetBin.location.lng !== 0 && (
+                  <div className="mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">GPS Coordinates</span>
+                      <a
+                        href={getGoogleMapsUrl(targetBin.location.lat, targetBin.location.lng)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-bold text-blue-600 hover:underline inline-flex items-center gap-0.5"
+                      >
+                        Google Maps <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <div className="font-mono font-bold text-slate-800 text-[11px] mt-1 flex items-center justify-between">
+                      <span>{formatCoordinates(targetBin.location.lat, targetBin.location.lng)}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCoordinates()}
+                        className="text-slate-400 hover:text-slate-700 p-0.5"
+                        title="Copy coordinates"
+                      >
+                        {copiedCoords ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 mt-3">
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
                     <div className="text-[10px] font-bold text-slate-400">Fill level</div>
                     <div className="text-base font-black text-rose-500 mt-0.5">{targetBin.currentFillLevel}%</div>
@@ -248,6 +514,7 @@ export const OperationsCommandCenter: React.FC<OperationsCommandCenterProps> = (
               <EmptyState icon={MapPin} title="No asset selected" description="Pick a bin on the map or from the register." compact />
             )}
           </div>
+
 
           {/* Incident Queue Card */}
           <div className="p-5 rounded-3xl border border-slate-200/80 bg-white shadow-xs flex-1">

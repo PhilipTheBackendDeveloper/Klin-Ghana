@@ -10,13 +10,13 @@ import { EmptyState } from '../common/EmptyState';
 import { AddBinModal } from './AddBinModal';
 import { BinLocationLabel } from '../common/BinLocationLabel';
 
-const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
+const MapRecenter: React.FC<{ center: [number, number]; zoom?: number }> = ({ center, zoom = 18 }) => {
   const map = useMap();
   useEffect(() => {
     if (center && Number.isFinite(center[0]) && Number.isFinite(center[1]) && center[0] !== 0 && center[1] !== 0) {
-      map.setView(center, map.getZoom(), { animate: true });
+      map.setView(center, zoom, { animate: true });
     }
-  }, [center, map]);
+  }, [center, zoom, map]);
   return null;
 };
 

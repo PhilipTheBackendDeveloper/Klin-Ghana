@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { CheckCircle2, Truck } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import { useSmartBin } from '../../context/SmartBinContext';
@@ -48,7 +48,7 @@ export const CollectionsAndRoutesView: React.FC = () => {
           </div>
 
           <div className="relative mt-2 h-[430px] overflow-hidden rounded-2xl">
-            <MapContainer center={center} zoom={12} maxZoom={MAP_MAX_ZOOM} scrollWheelZoom={false} className="h-full w-full">
+            <MapContainer center={center} zoom={13} maxZoom={MAP_MAX_ZOOM} scrollWheelZoom={true} className="h-full w-full">
               <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} maxZoom={MAP_MAX_ZOOM} />
               <TileLayer url={MAP_LABELS_TILE_URL} maxZoom={MAP_LABELS_MAX_ZOOM} />
               <MapAutoSize />

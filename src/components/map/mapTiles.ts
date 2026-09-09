@@ -1,27 +1,57 @@
 import L from 'leaflet';
 import { SmartBin } from '../../types';
 
-/**
- * Light, brand-matching basemap (Esri World Light Gray Canvas) instead of the
- * default OpenStreetMap "standard" tiles, whose bright yellow/pink/green
- * palette clashed with the app's blue/white/slate design system. Esri's
- * gray-canvas basemap is a free, no-API-key XYZ service purpose-built for
- * overlaying colored markers/data (CARTO's free tier now requires a key).
- */
-export const MAP_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
-export const MAP_LABELS_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}';
-export const MAP_TILE_ATTRIBUTION = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, OpenStreetMap contributors';
+export type MapStyle = 'satellite' | 'street' | 'canvas';
 
-// Esri's free World Light Gray Canvas has real detail for Kumasi/Accra only
-// up to these levels (verified directly against the tile service) — beyond
-// them the *base* layer literally returns a placeholder tile with "Map data
-// not yet available" baked into the image, and the *reference* (labels)
-// layer silently goes blank. Capping maxZoom on both the tile layers and the
-// map itself stops Leaflet from ever requesting (or letting a citizen zoom
-// into) tiles past the point real data exists — it upscales the last good
-// zoom level instead, which reads as "close enough" rather than broken.
-export const MAP_MAX_ZOOM = 16;
-export const MAP_LABELS_MAX_ZOOM = 13;
+export interface MapLayerConfig {
+  id: MapStyle;
+  label: string;
+  url: string;
+  labelsUrl?: string;
+  attribution: string;
+  maxZoom: number;
+  labelsMaxZoom?: number;
+  subdomains?: string[];
+}
+
+export const MAP_LAYERS: Record<MapStyle, MapLayerConfig> = {
+  satellite: {
+    id: 'satellite',
+    label: 'Satellite (Buildings)',
+    // Google Hybrid: High-resolution satellite imagery + building footprints + road overlays
+    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    attribution: 'Imagery &copy; Google Maps',
+    maxZoom: 20,
+  },
+  street: {
+    id: 'street',
+    label: 'Street Map',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+    subdomains: ['a', 'b', 'c'],
+  },
+  canvas: {
+    id: 'canvas',
+    label: 'Light Canvas',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    labelsUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri',
+    maxZoom: 16,
+    labelsMaxZoom: 13,
+  },
+};
+
+// Default layer is High-Resolution Satellite so actual buildings, compounds, and roofs are clearly visible
+export const MAP_TILE_URL = MAP_LAYERS.satellite.url;
+export const MAP_LABELS_TILE_URL = '';
+export const MAP_TILE_ATTRIBUTION = MAP_LAYERS.satellite.attribution;
+export const MAP_MAX_ZOOM = 20;
+export const MAP_LABELS_MAX_ZOOM = 20;
+
+export const getMapLayer = (style: MapStyle = 'satellite'): MapLayerConfig => {
+  return MAP_LAYERS[style] || MAP_LAYERS.satellite;
+};
 
 const STATUS_COLORS: Record<string, string> = {
   normal: '#1D70F5',

@@ -15,20 +15,20 @@ interface UserBinsViewProps {
 export const UserBinsView: React.FC<UserBinsViewProps> = ({ onSelectBin }) => {
   const { bins, citizenReports } = useSmartBin();
   const gpsBins = bins.filter((bin) => bin.gpsFix && Number.isFinite(bin.location.lat) && Number.isFinite(bin.location.lng));
-  const center: [number, number] = gpsBins[0] ? [gpsBins[0].location.lat, gpsBins[0].location.lng] : [5.6037, -0.1870];
+  const center: [number, number] = gpsBins[0] ? [gpsBins[0].location.lat, gpsBins[0].location.lng] : [6.671651, -1.562522];
   const recentReport = citizenReports[0];
 
   return (
     <div className="space-y-6 font-['Plus_Jakarta_Sans',sans-serif]">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="font-['Outfit',sans-serif] text-xl font-bold text-slate-900">Nearby SmartBins in Accra</h2>
+          <h2 className="font-['Outfit',sans-serif] text-xl font-bold text-slate-900">Nearby SmartBins</h2>
           <p className="text-xs text-slate-500">Find the closest live smart dustbin with available capacity.</p>
         </div>
       </div>
 
       <div className="relative h-[400px] overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm">
-        <MapContainer center={center} zoom={12} maxZoom={MAP_MAX_ZOOM} scrollWheelZoom={false} className="h-full w-full rounded-2xl">
+        <MapContainer center={center} zoom={gpsBins[0] ? 17 : 13} maxZoom={MAP_MAX_ZOOM} scrollWheelZoom={true} className="h-full w-full rounded-2xl">
           <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} maxZoom={MAP_MAX_ZOOM} />
           <TileLayer url={MAP_LABELS_TILE_URL} maxZoom={MAP_LABELS_MAX_ZOOM} />
           <MapAutoSize />
