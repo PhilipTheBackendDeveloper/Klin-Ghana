@@ -212,15 +212,25 @@ export default async function handler(req: any, res?: any) {
           };
 
           await supabase.from('telemetry').insert({ ...common, recorded_at: nowIso });
-          await supabase.from('bin_current_state').upsert({
+          const { error: stateError } = await supabase.from('bin_current_state').upsert({
             ...common,
             bin_status: evaluatedStatus,
             connection_status: 'ONLINE',
             last_seen_at: nowIso,
             telemetry_received_at: nowIso,
             updated_at: nowIso,
-            last_message_sequence: data.sequence,
           }, { onConflict: 'bin_id' });
+          if (stateError) {
+            console.error('[TELEMETRY] bin_current_state upsert error:', stateError);
+          }
+
+          if (hasGpsData) {
+            await supabase.from('bins').update({
+              latitude: finalLat,
+              longitude: finalLng,
+              updated_at: nowIso,
+            }).eq('id', bin.id);
+          }
 
           await supabase.from('devices').upsert({
             device_id: devId,

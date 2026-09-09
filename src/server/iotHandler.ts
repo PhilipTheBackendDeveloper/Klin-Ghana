@@ -182,7 +182,6 @@ export async function handleTelemetryIngestion(
           longitude: finalLng,
           gps_accuracy_m: hasGpsFix ? validData.gpsAccuracyM : null,
           gps_fix: hasGpsFix,
-          gps_updated_at: hasGpsFix ? (validData.gpsUpdatedAt || nowIso) : null,
           satellites: validData.satellites ?? 0,
           location_source: hasGpsFix ? 'GPS' : 'UNKNOWN',
           firmware_version: validData.firmwareVersion || '1.0.0-prod',
@@ -195,15 +194,25 @@ export async function handleTelemetryIngestion(
           recorded_at: nowIso,
         });
 
-        await supabase.from('bin_current_state').upsert({
+        const { error: stateError } = await supabase.from('bin_current_state').upsert({
           ...commonRow,
           bin_status: evaluatedStatus,
           connection_status: 'ONLINE',
           last_seen_at: nowIso,
           telemetry_received_at: nowIso,
           updated_at: nowIso,
-          last_message_sequence: sequenceNum,
         }, { onConflict: 'bin_id' });
+        if (stateError) {
+          console.error('[TELEMETRY] bin_current_state upsert error:', stateError);
+        }
+
+        if (hasGpsFix) {
+          await supabase.from('bins').update({
+            latitude: finalLat,
+            longitude: finalLng,
+            updated_at: nowIso,
+          }).eq('id', binRecord.id);
+        }
 
         await supabase.from('devices').upsert({
           device_id: deviceId,

@@ -178,7 +178,6 @@ export default {
       last_seen_at: nowIso,
       telemetry_received_at: nowIso,
       updated_at: nowIso,
-      last_message_sequence: sequence,
     });
     if (stateError) return json({ error: 'DATABASE_ERROR', message: stateError.message }, 500);
 
