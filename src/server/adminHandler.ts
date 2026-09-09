@@ -1,4 +1,4 @@
-﻿import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 // This handler is the ONLY place in the codebase (besides scripts/create-admin.mjs,
@@ -93,12 +93,12 @@ export async function handleCreateTeamMember(
     };
   }
 
-  const { error: profileError } = await supabase
+  const { error: upsertError } = await supabase
     .from('profiles')
     .upsert({ id: created.user.id, email, full_name: fullName, role }, { onConflict: 'id' });
 
-  if (profileError) {
-    return { statusCode: 500, headers: ADMIN_CORS_HEADERS, body: { ok: false, error: 'PROFILE_UPSERT_FAILED', message: profileError.message } };
+  if (upsertError) {
+    return { statusCode: 500, headers: ADMIN_CORS_HEADERS, body: { ok: false, error: 'PROFILE_UPSERT_FAILED', message: upsertError.message } };
   }
 
   return {

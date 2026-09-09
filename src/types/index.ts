@@ -1,12 +1,12 @@
-﻿export type UserRole = 'admin' | 'researcher' | 'citizen';
+export type UserRole = 'admin' | 'researcher' | 'citizen';
 
 export type BinStatus = 'normal' | 'warning' | 'critical' | 'overflow' | 'offline';
 
 export type WasteCategory = 'general' | 'plastic' | 'organic' | 'paper' | 'electronic' | 'glass';
 
 export interface GpsLocation {
-  lat: number | null;
-  lng: number | null;
+  lat: number;
+  lng: number;
   address: string;
   city: string;
   landmark?: string;

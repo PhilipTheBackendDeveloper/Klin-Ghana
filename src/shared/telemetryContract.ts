@@ -1,4 +1,4 @@
-﻿import { z } from 'zod';
+import { z } from 'zod';
 
 export const HardwareFillStatusSchema = z.enum([
   'NORMAL',
@@ -15,8 +15,8 @@ export type HardwareFillStatus = z.infer<typeof HardwareFillStatusSchema>;
 
 export const TelemetryPayloadSchema = z.object({
   schemaVersion: z.number().int().min(1).default(1),
-  messageId: z.string().min(8).max(128),
-  sequence: z.number().int().min(0),
+  messageId: z.string().min(1).max(128).optional(),
+  sequence: z.number().int().min(0).optional(),
   deviceId: z.string().min(3).max(64),
   timestamp: z.union([z.string(), z.number()]),
   fillPercentage: z.number().min(0).max(120),
@@ -90,7 +90,13 @@ export const isStaleSequence = (
   if (sequence === undefined) return false;
   const normalized = normalizeDeviceId(deviceId);
   const lastSequence = lastSequenceByDevice.get(normalized);
-  if (lastSequence !== undefined && sequence <= lastSequence) return true;
+  if (lastSequence !== undefined && sequence <= lastSequence) {
+    if (sequence === 1 || lastSequence - sequence > 10) {
+      lastSequenceByDevice.set(normalized, sequence);
+      return false;
+    }
+    return true;
+  }
   lastSequenceByDevice.set(normalized, sequence);
   return false;
 };

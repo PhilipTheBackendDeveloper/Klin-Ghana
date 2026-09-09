@@ -1,4 +1,4 @@
-﻿/*
+/*
  * SmartBin Intelligence / KlinGhana - SB-024 Core Microcontroller Firmware
  * Target MCU: ESP32-WROOM-32 Dev Module
  *
@@ -321,6 +321,7 @@ bool publishHttpTelemetry(const String& payload) {
   }
 
   HTTPClient http;
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   const String endpoint = getTelemetryEndpoint();
   if (endpoint.startsWith("https://")) {
     httpSecureClient.setInsecure();
