@@ -100,7 +100,7 @@ const getDemoValue = <T,>(key: string, fallback: T): T => {
 
 // The ESP32 reports every ~12s while it's alive (see firmware
 // TELEMETRY_INTERVAL_MS), but a device that has lost power, Wi-Fi, or
-// cloud reachability has no way to tell the server it went dark â€” it just
+// cloud reachability has no way to tell the server it went dark — it just
 // stops sending. `connection_status`/`bin_status` in bin_current_state are
 // therefore whatever the *last accepted packet* said (often still
 // "ONLINE"), and never flip back on their own. Recency is the only
@@ -158,7 +158,7 @@ const mapBinRows = (rows: any[]): SmartBin[] => rows.map((row) => {
     telemetryMessageId: state?.message_id || undefined,
     telemetrySequence: state?.last_message_sequence ?? state?.message_sequence ?? undefined,
     assignedZone: row.zone || undefined,
-    notes: !state ? 'No telemetry received' : isBinStale(state) ? 'Device has gone quiet â€” no telemetry received recently' : undefined,
+    notes: !state ? 'No telemetry received' : isBinStale(state) ? 'Device has gone quiet — no telemetry received recently' : undefined,
   } as SmartBin;
 });
 

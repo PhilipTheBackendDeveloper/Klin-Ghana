@@ -4,7 +4,7 @@ import { z } from 'zod';
 // This handler is the ONLY place in the codebase (besides scripts/create-admin.mjs,
 // which runs locally on a developer's machine) that touches SUPABASE_SECRET_KEY. It
 // must only ever run server-side (Vite dev middleware, or a Vercel serverless
-// function) â€” never import this from src/ code that ships to the browser.
+// function) — never import this from src/ code that ships to the browser.
 const getServiceClient = () => {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
